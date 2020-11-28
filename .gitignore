@@ -1,0 +1,9 @@
+node_modules
+build
+flats
+.idea
+coverage
+deploy/*.config
+deploy/*.env*
+!deploy/.env.example
+deploy/bridgeDeploymentResults.json

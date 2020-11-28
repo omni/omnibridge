@@ -1,0 +1,12 @@
+{
+  "extends": "solhint:recommended",
+  "plugins": ["prettier"],
+  "rules": {
+    "prettier/prettier": "error",
+    "avoid-low-level-calls": "off",
+    "no-inline-assembly": "off",
+    "reason-string": "off",
+    "func-visibility": ["warn", { "ignoreConstructors": true } ],
+    "compiler-version": ["error", "0.7.5"]
+  }
+}
