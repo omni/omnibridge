@@ -1,0 +1,19 @@
+FROM node:14
+
+WORKDIR /contracts
+
+COPY package.json yarn.lock ./
+RUN yarn
+
+COPY truffle-config.js truffle-config.js
+COPY ./contracts ./contracts
+RUN yarn compile
+
+COPY flatten.sh flatten.sh
+RUN bash flatten.sh
+
+COPY deploy.sh deploy.sh
+COPY ./deploy ./deploy
+COPY ./test ./test
+
+ENV PATH="/contracts/:${PATH}"

@@ -1,0 +1,15 @@
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+
+const EXPLORER_TYPES = {
+  ETHERSCAN: 'etherscan',
+  BLOCKSCOUT: 'blockscout',
+}
+const REQUEST_STATUS = {
+  OK: 'OK',
+}
+
+module.exports = {
+  ZERO_ADDRESS,
+  EXPLORER_TYPES,
+  REQUEST_STATUS,
+}
