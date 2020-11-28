@@ -1,16 +1,16 @@
 pragma solidity 0.7.5;
 
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "../../interfaces/IERC677.sol";
-import "../ReentrancyGuard.sol";
-import "../ChooseReceiverHelper.sol";
-import "../BasicAMBMediator.sol";
+import "../../../../interfaces/IERC677.sol";
+import "../../../../libraries/Bytes.sol";
+import "../../../ReentrancyGuard.sol";
+import "../../../BasicAMBMediator.sol";
 
 /**
- * @title MultiTokenRelayer
- * @dev Common functionality for bridging multiple tokens to the other side of the bridge.
+ * @title TokensRelayer
+ * @dev Functionality for bridging multiple tokens to the other side of the bridge.
  */
-abstract contract MultiTokenRelayer is BasicAMBMediator, ReentrancyGuard, ChooseReceiverHelper {
+abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard {
     using SafeERC20 for IERC677;
 
     /**
@@ -80,17 +80,19 @@ abstract contract MultiTokenRelayer is BasicAMBMediator, ReentrancyGuard, Choose
     }
 
     /**
-     * @dev Tells the mediator contract address from the other network.
-     * @return the address of the mediator contract.
+     * @dev Helper function for alternative receiver feature. Chooses the actual receiver out of sender and passed data.
+     * @param _from address of tokens sender.
+     * @param _data passed data in the transfer message.
+     * @return recipient address of the receiver on the other side.
      */
-    function mediatorContractOnOtherSide()
-        public
-        view
-        virtual
-        override(BasicAMBMediator, ChooseReceiverHelper)
-        returns (address)
-    {
-        return BasicAMBMediator.mediatorContractOnOtherSide();
+    function chooseReceiver(address _from, bytes memory _data) internal view returns (address recipient) {
+        recipient = _from;
+        if (_data.length > 0) {
+            require(_data.length == 20);
+            recipient = Bytes.bytesToAddress(_data);
+            require(recipient != address(0));
+            require(recipient != mediatorContractOnOtherSide());
+        }
     }
 
     function bridgeSpecificActionsOnTokenTransfer(

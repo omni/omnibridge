@@ -144,12 +144,21 @@ contract HomeMultiAMBErc20ToErc677 is
         }
     }
 
+    /**
+     * @dev Internal function for sending an AMB message.
+     * Takes into account forwarding rules from forwardingRulesManager().
+     * @param _data data to be sent to the other side of the bridge.
+     * @param _token address of the home token contract within the bridged pair.
+     * @param _from address of the tokens sender.
+     * @param _receiver address of the tokens receiver on the other side.
+     * @return id of the sent message.
+     */
     function _passMessage(
         bytes memory _data,
         address _token,
         address _from,
         address _receiver
-    ) internal override returns (bytes32) {
+    ) internal returns (bytes32) {
         address executor = mediatorContractOnOtherSide();
         uint256 gasLimit = requestGasLimit();
         IAMB bridge = bridgeContract();
@@ -161,12 +170,22 @@ contract HomeMultiAMBErc20ToErc677 is
                 : bridge.requireToConfirmMessage(executor, _data, gasLimit);
     }
 
+    /**
+     * @dev Internal function for initializing newly bridged token related information.
+     * @param _token address of the token contract.
+     * @param _decimals token decimals parameter.
+     */
     function _initToken(address _token, uint8 _decimals) internal override {
         super._initToken(_token, _decimals);
         _setFee(HOME_TO_FOREIGN_FEE, _token, getFee(HOME_TO_FOREIGN_FEE, address(0)));
         _setFee(FOREIGN_TO_HOME_FEE, _token, getFee(FOREIGN_TO_HOME_FEE, address(0)));
     }
 
+    /**
+     * @dev Internal function for transforming the bridged token name. Appends a side-specific suffix.
+     * @param _name bridged token from the other side.
+     * @return token name for this side of the bridge.
+     */
     function _transformName(string memory _name) internal pure override returns (string memory) {
         return string(abi.encodePacked(_name, " on xDai"));
     }

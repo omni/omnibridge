@@ -1,12 +1,12 @@
 pragma solidity 0.7.5;
 
-import "../../upgradeability/EternalStorage.sol";
+import "../../../../upgradeability/EternalStorage.sol";
 
 /**
- * @title MultiTokenNativeRegistry
- * @dev Common functionality for keeping track of registered native tokens for multi-erc20-to-erc677 mediator.
+ * @title NativeTokensRegistry
+ * @dev Functionality for keeping track of registered native tokens.
  */
-contract MultiTokenNativeRegistry is EternalStorage {
+contract NativeTokensRegistry is EternalStorage {
     /**
      * @dev Checks if a given token is a bridged token that is native to this side of the bridge.
      * @param _token address of token contract.

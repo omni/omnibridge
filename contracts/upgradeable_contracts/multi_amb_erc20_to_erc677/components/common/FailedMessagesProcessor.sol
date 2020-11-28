@@ -1,41 +1,14 @@
 pragma solidity 0.7.5;
 
-import "../../interfaces/IERC677.sol";
-import "./BasicMultiTokenBridge.sol";
-import "../BasicAMBMediator.sol";
-import "../ChooseReceiverHelper.sol";
-import "../TransferInfoStorage.sol";
+import "../../../BasicAMBMediator.sol";
+import "./BridgeOperationsStorage.sol";
 
 /**
- * @title MultiTokenBridgeMediator
- * @dev Common mediator functionality to handle operations related to multi-token bridge messages sent to AMB bridge.
+ * @title FailedMessagesProcessor
+ * @dev Functionality for fixing failed bridging operations.
  */
-abstract contract MultiTokenBridgeMediator is BasicAMBMediator, BasicMultiTokenBridge, TransferInfoStorage {
+abstract contract FailedMessagesProcessor is BasicAMBMediator, BridgeOperationsStorage {
     event FailedMessageFixed(bytes32 indexed messageId, address token, address recipient, uint256 value);
-    event TokensBridgingInitiated(
-        address indexed token,
-        address indexed sender,
-        uint256 value,
-        bytes32 indexed messageId
-    );
-    event TokensBridged(address indexed token, address indexed recipient, uint256 value, bytes32 indexed messageId);
-
-    /**
-     * @dev Stores the bridged token of a message sent to the AMB bridge.
-     * @param _messageId of the message sent to the bridge.
-     * @param _token bridged token address.
-     */
-    function setMessageToken(bytes32 _messageId, address _token) internal {
-        addressStorage[keccak256(abi.encodePacked("messageToken", _messageId))] = _token;
-    }
-
-    /**
-     * @dev Tells the bridged token address of a message sent to the AMB bridge.
-     * @return address of a token contract.
-     */
-    function messageToken(bytes32 _messageId) internal view returns (address) {
-        return addressStorage[keccak256(abi.encodePacked("messageToken", _messageId))];
-    }
 
     /**
      * @dev Method to be called when a bridged message execution failed. It will generate a new message requesting to
@@ -66,6 +39,22 @@ abstract contract MultiTokenBridgeMediator is BasicAMBMediator, BasicMultiTokenB
         setMessageFixed(_messageId);
         executeActionOnFixedTokens(_messageId, token, recipient, value);
         emit FailedMessageFixed(_messageId, token, recipient, value);
+    }
+
+    /**
+     * @dev Tells if a message sent to the AMB bridge has been fixed.
+     * @return bool indicating the status of the message.
+     */
+    function messageFixed(bytes32 _messageId) public view returns (bool) {
+        return boolStorage[keccak256(abi.encodePacked("messageFixed", _messageId))];
+    }
+
+    /**
+     * @dev Sets that the message sent to the AMB bridge has been fixed.
+     * @param _messageId of the message sent to the bridge.
+     */
+    function setMessageFixed(bytes32 _messageId) internal {
+        boolStorage[keccak256(abi.encodePacked("messageFixed", _messageId))] = true;
     }
 
     function executeActionOnFixedTokens(

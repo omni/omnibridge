@@ -8,6 +8,9 @@ import "./BasicMultiAMBErc20ToErc677.sol";
  * It is designed to be used as an implementation contract of EternalStorageProxy contract.
  */
 contract ForeignMultiAMBErc20ToErc677 is BasicMultiAMBErc20ToErc677 {
+    using SafeERC20 for IERC677;
+    using SafeMath for uint256;
+
     /**
      * @dev Stores the initial parameters of the mediator.
      * @param _bridgeContract the address of the AMB bridge contract.
@@ -44,6 +47,70 @@ contract ForeignMultiAMBErc20ToErc677 is BasicMultiAMBErc20ToErc677 {
         return isInitialized();
     }
 
+    /**
+     * @dev Handles the bridged tokens.
+     * Checks that the value is inside the execution limits and invokes the Mint or Unlock accordingly.
+     * @param _token token contract address on this side of the bridge.
+     * @param _isNative true, if given token is native to this chain and Unlock should be used.
+     * @param _recipient address that will receive the tokens.
+     * @param _value amount of tokens to be received.
+     */
+    function _handleTokens(
+        address _token,
+        bool _isNative,
+        address _recipient,
+        uint256 _value
+    ) internal override {
+        require(withinExecutionLimit(_token, _value));
+        addTotalExecutedPerDay(_token, getCurrentDay(), _value);
+
+        if (_isNative) {
+            IERC677(_token).safeTransfer(_recipient, _value);
+            _setMediatorBalance(_token, mediatorBalance(_token).sub(_value));
+        } else {
+            IBurnableMintableERC677Token(_token).mint(_recipient, _value);
+        }
+
+        emit TokensBridged(_token, _recipient, _value, messageId());
+    }
+
+    /**
+     * @dev Executes action on deposit of bridged tokens
+     * @param _token address of the token contract
+     * @param _from address of tokens sender
+     * @param _receiver address of tokens receiver on the other side
+     * @param _value requested amount of bridged tokens
+     */
+    function bridgeSpecificActionsOnTokenTransfer(
+        address _token,
+        address _from,
+        address _receiver,
+        uint256 _value
+    ) internal virtual override {
+        uint8 decimals;
+        bool isKnownToken = isTokenRegistered(_token);
+        bool isNativeToken = !isKnownToken || isRegisteredAsNativeToken(_token);
+
+        // native unbridged token
+        if (!isKnownToken) {
+            decimals = uint8(TokenReader.readDecimals(_token));
+            _initToken(_token, decimals);
+        }
+
+        require(withinLimit(_token, _value));
+        addTotalSpentPerDay(_token, getCurrentDay(), _value);
+
+        bytes memory data = _prepareMessage(isKnownToken, isNativeToken, _token, _receiver, _value, decimals);
+        bytes32 _messageId =
+            bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), data, requestGasLimit());
+        _recordBridgeOperation(!isKnownToken, _messageId, _token, _from, _value);
+    }
+
+    /**
+     * @dev Internal function for transforming the bridged token name. Appends a side-specific suffix.
+     * @param _name bridged token from the other side.
+     * @return token name for this side of the bridge.
+     */
     function _transformName(string memory _name) internal pure override returns (string memory) {
         return string(abi.encodePacked(_name, " on Mainnet"));
     }

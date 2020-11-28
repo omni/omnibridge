@@ -1,12 +1,12 @@
 pragma solidity 0.7.5;
 
-import "../../upgradeability/EternalStorage.sol";
+import "../../../../upgradeability/EternalStorage.sol";
 
 /**
- * @title MultiTokenBridgedRegistry
- * @dev Common functionality for keeping track of registered bridged tokens pairs for multi-erc20-to-erc677 mediator.
+ * @title BridgedTokensRegistry
+ * @dev Functionality for keeping track of registered bridged token pairs.
  */
-contract MultiTokenBridgedRegistry is EternalStorage {
+contract BridgedTokensRegistry is EternalStorage {
     event NewTokenRegistered(address indexed nativeToken, address indexed bridgedToken);
 
     /**

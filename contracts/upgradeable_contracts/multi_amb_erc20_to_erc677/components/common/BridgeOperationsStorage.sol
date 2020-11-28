@@ -1,8 +1,29 @@
 pragma solidity 0.7.5;
 
-import "../upgradeability/EternalStorage.sol";
+import "../../../../upgradeability/EternalStorage.sol";
 
-contract TransferInfoStorage is EternalStorage {
+/**
+ * @title BridgeOperationsStorage
+ * @dev Functionality for storing processed bridged operations.
+ */
+abstract contract BridgeOperationsStorage is EternalStorage {
+    /**
+     * @dev Stores the bridged token of a message sent to the AMB bridge.
+     * @param _messageId of the message sent to the bridge.
+     * @param _token bridged token address.
+     */
+    function setMessageToken(bytes32 _messageId, address _token) internal {
+        addressStorage[keccak256(abi.encodePacked("messageToken", _messageId))] = _token;
+    }
+
+    /**
+     * @dev Tells the bridged token address of a message sent to the AMB bridge.
+     * @return address of a token contract.
+     */
+    function messageToken(bytes32 _messageId) internal view returns (address) {
+        return addressStorage[keccak256(abi.encodePacked("messageToken", _messageId))];
+    }
+
     /**
      * @dev Stores the value of a message sent to the AMB bridge.
      * @param _messageId of the message sent to the bridge.
@@ -35,21 +56,5 @@ contract TransferInfoStorage is EternalStorage {
      */
     function messageRecipient(bytes32 _messageId) internal view returns (address) {
         return addressStorage[keccak256(abi.encodePacked("messageRecipient", _messageId))];
-    }
-
-    /**
-     * @dev Sets that the message sent to the AMB bridge has been fixed.
-     * @param _messageId of the message sent to the bridge.
-     */
-    function setMessageFixed(bytes32 _messageId) internal {
-        boolStorage[keccak256(abi.encodePacked("messageFixed", _messageId))] = true;
-    }
-
-    /**
-     * @dev Tells if a message sent to the AMB bridge has been fixed.
-     * @return bool indicating the status of the message.
-     */
-    function messageFixed(bytes32 _messageId) public view returns (bool) {
-        return boolStorage[keccak256(abi.encodePacked("messageFixed", _messageId))];
     }
 }

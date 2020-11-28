@@ -1,18 +1,18 @@
 pragma solidity 0.7.5;
 
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "./BasicMultiTokenBridge.sol";
 import "../BaseRewardAddressList.sol";
 import "../Ownable.sol";
 import "../../interfaces/IERC677.sol";
 import "../../interfaces/IBurnableMintableERC677Token.sol";
+import "./components/common/TokensBridgeLimits.sol";
 
 /**
  * @title HomeFeeManagerMultiAMBErc20ToErc677
  * @dev Implements the logic to distribute fees from the multi erc20 to erc677 mediator contract operations.
  * The fees are distributed in the form of native tokens to the list of reward accounts.
  */
-contract HomeFeeManagerMultiAMBErc20ToErc677 is BaseRewardAddressList, Ownable, BasicMultiTokenBridge {
+contract HomeFeeManagerMultiAMBErc20ToErc677 is BaseRewardAddressList, Ownable, TokensBridgeLimits {
     using SafeMath for uint256;
     using SafeERC20 for IERC677;
 
