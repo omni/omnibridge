@@ -9,9 +9,6 @@ const { expect } = require('chai')
 const { getEvents, expectEventInLogs, ether, strip0x } = require('../helpers/helpers')
 const { ZERO_ADDRESS, toBN, requirePrecompiled } = require('../setup')
 
-const ERC677BridgeToken = requirePrecompiled('ERC677BridgeToken')
-const PermittableToken = requirePrecompiled('PermittableToken')
-
 const ZERO = toBN(0)
 const halfEther = ether('0.5')
 const oneEther = ether('1')
@@ -26,7 +23,10 @@ const exampleMessageId = '0xf308b922ab9f8a7128d9d7bc9bce22cd88b2c05c8213f0e2d810
 const otherMessageId = '0x35d3818e50234655f6aebb2a1cfbf30f59568d8a4ec72066fac5a25dbe7b8121'
 const failedMessageId = '0x2ebc2ccc755acc8eaf9252e19573af708d644ab63a39619adb080a3500a4ff2e'
 
-contract('ForeignMultiAMBErc20ToErc677', async (accounts) => {
+contract('ForeignMultiAMBErc20ToErc677', (accounts) => {
+  let ERC677BridgeToken
+  let PermittableToken
+
   let contract
   let token
   let ambBridgeContract
@@ -37,6 +37,12 @@ contract('ForeignMultiAMBErc20ToErc677', async (accounts) => {
   const user = accounts[1]
   const user2 = accounts[2]
   const value = oneEther
+
+  before(async () => {
+    ERC677BridgeToken = await requirePrecompiled('ERC677BridgeToken')
+    PermittableToken = await requirePrecompiled('PermittableToken')
+  })
+
   beforeEach(async () => {
     contract = await ForeignMultiAMBErc20ToErc677.new()
     ambBridgeContract = await AMBMock.new()

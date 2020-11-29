@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "scripts/test.sh",
+    "coverage": "SOLIDITY_COVERAGE=true scripts/test.sh",
     "compile": "truffle compile",
     "flatten": "bash flatten.sh",
     "lint": "yarn run lint:js && yarn run lint:sol",
@@ -41,7 +42,8 @@
     "prettier-plugin-solidity": "^1.0.0-beta.1",
     "solhint": "^3.3.2",
     "solhint-plugin-prettier": "0.0.5",
-    "truffle": "^5.0.35",
+    "solidity-coverage": "^0.7.12",
+    "truffle": "^5.1.55",
     "truffle-flattener": "^1.4.2"
   },
   "engines": {

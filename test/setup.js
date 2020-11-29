@@ -13,10 +13,12 @@ exports.ERROR_MSG_OPCODE = 'VM Exception while processing transaction: invalid o
 exports.ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 exports.F_ADDRESS = '0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF'
 exports.INVALID_ARGUMENTS = 'Invalid number of arguments to Solidity function'
-exports.requirePrecompiled = (path) => {
+exports.requirePrecompiled = async (path) => {
   const artifact = require(`../precompiled/${path}`)
   const contract = truffleContract(artifact)
   contract.setProvider(web3.currentProvider)
-  contract.defaults({ from: '0x627306090abaB3A6e1400e9345bC60c78a8BEf57' })
+  const accounts = await web3.eth.getAccounts()
+  contract.defaults({ from: accounts[0] })
+  contract.disableConfirmationListener = true
   return contract
 }

@@ -7,3 +7,4 @@ deploy/*.config
 deploy/*.env*
 !deploy/.env.example
 deploy/bridgeDeploymentResults.json
+coverage.json

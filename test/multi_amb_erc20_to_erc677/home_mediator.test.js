@@ -10,9 +10,6 @@ const { expect } = require('chai')
 const { getEvents, expectEventInLogs, ether, strip0x } = require('../helpers/helpers')
 const { ZERO_ADDRESS, toBN, requirePrecompiled } = require('../setup')
 
-const ERC677BridgeToken = requirePrecompiled('ERC677BridgeToken')
-const PermittableToken = requirePrecompiled('PermittableToken')
-
 const ZERO = toBN(0)
 const halfEther = ether('0.5')
 const oneEther = ether('1')
@@ -28,7 +25,10 @@ const otherMessageId = '0x35d3818e50234655f6aebb2a1cfbf30f59568d8a4ec72066fac5a2
 const deployMessageId = '0x87b0c56ed7052872cd6ac5ad2e4d23b3e9bc7637837d099f083dae24aae5b2f2'
 const failedMessageId = '0x2ebc2ccc755acc8eaf9252e19573af708d644ab63a39619adb080a3500a4ff2e'
 
-contract('HomeMultiAMBErc20ToErc677', async (accounts) => {
+contract('HomeMultiAMBErc20ToErc677', (accounts) => {
+  let ERC677BridgeToken
+  let PermittableToken
+
   let contract
   let token
   let ambBridgeContract
@@ -42,12 +42,19 @@ contract('HomeMultiAMBErc20ToErc677', async (accounts) => {
   const user = accounts[1]
   const user2 = accounts[2]
   const value = oneEther
+
+  before(async () => {
+    ERC677BridgeToken = await requirePrecompiled('ERC677BridgeToken')
+    PermittableToken = await requirePrecompiled('PermittableToken')
+
+    otherSideAMBBridgeContract = await AMBMock.new()
+    await otherSideAMBBridgeContract.setMaxGasPerTx(maxGasPerTx)
+  })
+
   beforeEach(async () => {
     contract = await HomeMultiAMBErc20ToErc677.new()
     ambBridgeContract = await AMBMock.new()
-    otherSideAMBBridgeContract = await AMBMock.new()
     await ambBridgeContract.setMaxGasPerTx(maxGasPerTx)
-    await otherSideAMBBridgeContract.setMaxGasPerTx(maxGasPerTx)
     otherSideMediator = await ForeignMultiAMBErc20ToErc677.new()
     tokenImage = await PermittableToken.new('TEST', 'TST', 18, 1337)
     const otherSideTokenFactory = await TokenFactory.new(owner, tokenImage.address)
@@ -129,9 +136,12 @@ contract('HomeMultiAMBErc20ToErc677', async (accounts) => {
     expect(events.length).to.be.equal(1)
     expect(events[0].returnValues.nativeToken).to.be.equal(token.address)
     const homeToken = await PermittableToken.at(events[0].returnValues.bridgedToken)
+    let bridgedValue = value
     const fee = await contract.getFee(await contract.FOREIGN_TO_HOME_FEE(), ZERO_ADDRESS)
-    const rewardAccounts = (await contract.rewardAddressCount()).toNumber()
-    const bridgedValue = rewardAccounts > 0 ? toBN(value).mul(oneEther.sub(fee)).div(oneEther) : value
+    if (fee.gt(ZERO)) {
+      const rewardAccounts = (await contract.rewardAddressCount()).toNumber()
+      bridgedValue = rewardAccounts > 0 ? toBN(value).mul(oneEther.sub(fee)).div(oneEther) : value
+    }
     expect(await homeToken.balanceOf(user)).to.be.bignumber.equal(bridgedValue)
     return homeToken
   }

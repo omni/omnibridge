@@ -7,6 +7,7 @@ module.exports = {
       network_id: '*',
       gasPrice: 100000000000,
       gas: 10000000,
+      disableConfirmationListener: true,
     },
   },
   compilers: {
@@ -21,4 +22,5 @@ module.exports = {
       },
     },
   },
+  plugins: ['solidity-coverage'],
 }
