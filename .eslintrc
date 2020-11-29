@@ -27,6 +27,7 @@
     "import/no-dynamic-require": "off",
     "global-require": "off",
     "no-loop-func": "off",
-    "no-console": "off"
+    "no-console": "off",
+    "node/no-missing-require": "off"
   }
 }
