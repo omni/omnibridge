@@ -157,6 +157,7 @@ abstract contract BasicMultiAMBErc20ToErc677 is
             diff = available;
         }
         addTotalSpentPerDay(_token, getCurrentDay(), diff);
+        _setMediatorBalance(_token, mediatorBalance(_token).add(diff));
 
         bytes memory data = abi.encodeWithSelector(this.handleBridgedTokens.selector, _token, _receiver, diff);
 
