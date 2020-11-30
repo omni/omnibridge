@@ -5,7 +5,7 @@ const { HOME_ERC677_TOKEN_IMAGE, HOME_TOKEN_FACTORY, HOME_BRIDGE_OWNER } = requi
 const {
   EternalStorageProxy,
   HomeMultiAMBErc20ToErc677: HomeBridge,
-  ERC677BridgeTokenPermittable,
+  PermittableToken,
   TokenFactory,
 } = require('../loadContracts')
 
@@ -24,7 +24,7 @@ async function deployHome() {
     if (!homeTokenImage) {
       console.log('\n[Home] Deploying new ERC677 token image')
       const chainId = await web3Home.eth.getChainId()
-      const erc677token = await deployContract(ERC677BridgeTokenPermittable, ['', '', 0, chainId], {
+      const erc677token = await deployContract(PermittableToken, ['', '', 0, chainId], {
         nonce: nonce++,
       })
       homeTokenImage = erc677token.options.address

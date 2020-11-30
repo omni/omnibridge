@@ -3,7 +3,7 @@ const { deployContract, upgradeProxy } = require('../deploymentUtils')
 const {
   EternalStorageProxy,
   ForeignMultiAMBErc20ToErc677: ForeignBridge,
-  ERC677BridgeTokenPermittable,
+  PermittableToken,
   TokenFactory,
 } = require('../loadContracts')
 const { FOREIGN_TOKEN_FACTORY, FOREIGN_ERC677_TOKEN_IMAGE, FOREIGN_BRIDGE_OWNER } = require('../loadEnv')
@@ -24,7 +24,7 @@ async function deployForeign() {
     if (!foreignTokenImage) {
       console.log('\n[Foreign] Deploying new ERC677 token image')
       const chainId = await web3Foreign.eth.getChainId()
-      const erc677token = await deployContract(ERC677BridgeTokenPermittable, ['', '', 0, chainId], {
+      const erc677token = await deployContract(PermittableToken, ['', '', 0, chainId], {
         network: 'foreign',
         nonce: nonce++,
       })

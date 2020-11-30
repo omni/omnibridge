@@ -96,11 +96,5 @@ const env = envalid.cleanEnv(process.env, validations)
 
 checkLimits(env.HOME_MIN_AMOUNT_PER_TX, env.HOME_MAX_AMOUNT_PER_TX, env.HOME_DAILY_LIMIT, homePrefix)
 checkLimits(env.FOREIGN_MIN_AMOUNT_PER_TX, env.FOREIGN_MAX_AMOUNT_PER_TX, env.FOREIGN_DAILY_LIMIT, foreignPrefix)
-if (!env.HOME_TOKEN_FACTORY && !env.HOME_ERC677_TOKEN_IMAGE) {
-  throw new Error('At least one of HOME_TOKEN_FACTORY and HOME_ERC677_TOKEN_IMAGE should be specified')
-}
-if (!env.FOREIGN_TOKEN_FACTORY && !env.FOREIGN_ERC677_TOKEN_IMAGE) {
-  throw new Error('At least one of FOREIGN_TOKEN_FACTORY and FOREIGN_ERC677_TOKEN_IMAGE should be specified')
-}
 
 module.exports = env

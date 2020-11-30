@@ -4,4 +4,5 @@ module.exports = {
   ForeignMultiAMBErc20ToErc677: require(`../../build/contracts/ForeignMultiAMBErc20ToErc677.json`),
   TokenFactory: require(`../../build/contracts/TokenFactory.json`),
   MultiTokenForwardingRulesManager: require(`../../build/contracts/MultiTokenForwardingRulesManager.json`),
+  PermittableToken: require(`../../precompiled/PermittableToken.json`),
 }
