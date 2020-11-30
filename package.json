@@ -7,7 +7,7 @@
     "test": "scripts/test.sh",
     "coverage": "SOLIDITY_COVERAGE=true scripts/test.sh",
     "compile": "truffle compile",
-    "flatten": "bash flatten.sh",
+    "flatten": "bash flatten.sh 2>/dev/null",
     "lint": "yarn run lint:js && yarn run lint:sol",
     "lint:js": "eslint .",
     "lint:js:fix": "eslint . --fix",
