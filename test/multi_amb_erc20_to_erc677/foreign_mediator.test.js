@@ -41,6 +41,9 @@ contract('ForeignMultiAMBErc20ToErc677', (accounts) => {
   before(async () => {
     ERC677BridgeToken = await requirePrecompiled('ERC677BridgeToken')
     PermittableToken = await requirePrecompiled('PermittableToken')
+
+    const tokenImage = await PermittableToken.new('TEST', 'TST', 18, 1337)
+    tokenFactory = await TokenFactory.new(owner, tokenImage.address)
   })
 
   beforeEach(async () => {
@@ -50,8 +53,6 @@ contract('ForeignMultiAMBErc20ToErc677', (accounts) => {
     otherSideMediator = await HomeMultiAMBErc20ToErc677.new()
     token = await ERC677BridgeToken.new('TEST', 'TST', 18)
     currentDay = await contract.getCurrentDay()
-    const tokenImage = await PermittableToken.new('TEST', 'TST', 18, 1337)
-    tokenFactory = await TokenFactory.new(owner, tokenImage.address)
   })
 
   const sendFunctions = [

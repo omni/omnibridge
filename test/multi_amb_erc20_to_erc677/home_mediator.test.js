@@ -35,8 +35,8 @@ contract('HomeMultiAMBErc20ToErc677', (accounts) => {
   let otherSideAMBBridgeContract
   let otherSideMediator
   let currentDay
-  let tokenImage
   let tokenFactory
+  let otherSideTokenFactory
   let homeToken
   const owner = accounts[0]
   const user = accounts[1]
@@ -49,6 +49,10 @@ contract('HomeMultiAMBErc20ToErc677', (accounts) => {
 
     otherSideAMBBridgeContract = await AMBMock.new()
     await otherSideAMBBridgeContract.setMaxGasPerTx(maxGasPerTx)
+
+    const tokenImage = await PermittableToken.new('TEST', 'TST', 18, 1337)
+    tokenFactory = await TokenFactory.new(owner, tokenImage.address)
+    otherSideTokenFactory = await TokenFactory.new(owner, tokenImage.address)
   })
 
   beforeEach(async () => {
@@ -56,8 +60,6 @@ contract('HomeMultiAMBErc20ToErc677', (accounts) => {
     ambBridgeContract = await AMBMock.new()
     await ambBridgeContract.setMaxGasPerTx(maxGasPerTx)
     otherSideMediator = await ForeignMultiAMBErc20ToErc677.new()
-    tokenImage = await PermittableToken.new('TEST', 'TST', 18, 1337)
-    const otherSideTokenFactory = await TokenFactory.new(owner, tokenImage.address)
     await otherSideMediator.initialize(
       otherSideAMBBridgeContract.address,
       contract.address,
@@ -68,7 +70,6 @@ contract('HomeMultiAMBErc20ToErc677', (accounts) => {
       otherSideTokenFactory.address
     )
     token = await ERC677BridgeToken.new('TEST', 'TST', 18)
-    tokenFactory = await TokenFactory.new(owner, tokenImage.address)
     currentDay = await contract.getCurrentDay()
   })
 
