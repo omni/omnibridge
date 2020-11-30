@@ -64,6 +64,24 @@ contract HomeMultiAMBErc20ToErc677 is
     }
 
     /**
+     * @dev Alias for bridgedTokenAddress for interface compatibility with the prior version of the Home mediator.
+     * @param _foreignToken address of the native token contract on the other side.
+     * @return address of the deployed bridged token contract.
+     */
+    function homeTokenAddress(address _foreignToken) public view returns (address) {
+        return bridgedTokenAddress(_foreignToken);
+    }
+
+    /**
+     * @dev Alias for nativeTokenAddress for interface compatibility with the prior version of the Home mediator.
+     * @param _homeToken address of the created bridged token contract on this side.
+     * @return address of the native token contract on the other side of the bridge.
+     */
+    function foreignTokenAddress(address _homeToken) public view returns (address) {
+        return nativeTokenAddress(_homeToken);
+    }
+
+    /**
      * @dev Handles the bridged tokens.
      * Checks that the value is inside the execution limits and invokes the Mint or Unlock accordingly.
      * @param _token token contract address on this side of the bridge.
