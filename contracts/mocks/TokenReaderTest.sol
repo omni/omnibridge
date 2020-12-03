@@ -85,6 +85,12 @@ contract Token7 {
     }
 }
 
+contract Token8 {
+    fallback() external {
+        revert("Error message");
+    }
+}
+
 contract TokenReaderTest {
     function test1() external {
         address token = address(new Token1());
@@ -136,6 +142,14 @@ contract TokenReaderTest {
 
     function test7() external {
         address token = address(new Token7());
+
+        require(keccak256(abi.encodePacked(TokenReader.readName(token))) == keccak256(""));
+        require(keccak256(abi.encodePacked(TokenReader.readSymbol(token))) == keccak256(""));
+        require(TokenReader.readDecimals(token) == 0);
+    }
+
+    function test8() external {
+        address token = address(new Token8());
 
         require(keccak256(abi.encodePacked(TokenReader.readName(token))) == keccak256(""));
         require(keccak256(abi.encodePacked(TokenReader.readSymbol(token))) == keccak256(""));

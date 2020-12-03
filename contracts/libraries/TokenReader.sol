@@ -1,5 +1,16 @@
 pragma solidity 0.7.5;
 
+// solhint-disable
+interface ITokenDetails {
+    function name() external view;
+    function NAME() external view;
+    function symbol() external view;
+    function SYMBOL() external view;
+    function decimals() external view;
+    function DECIMALS() external view;
+}
+// solhint-enable
+
 /**
  * @title TokenReader
  * @dev Helper methods for reading name/symbol/decimals parameters from ERC20 token contracts.
@@ -13,47 +24,14 @@ library TokenReader {
      * @return token name as a string or an empty string if none of the methods succeeded.
      */
     function readName(address _token) internal view returns (string memory) {
-        uint256 ptr;
-        uint256 size;
-        assembly {
-            ptr := mload(0x40)
-            mstore(ptr, 0x06fdde0300000000000000000000000000000000000000000000000000000000) // name()
-            if iszero(staticcall(gas(), _token, ptr, 4, ptr, 32)) {
-                mstore(ptr, 0xa3f4df7e00000000000000000000000000000000000000000000000000000000) // NAME()
-                pop(staticcall(gas(), _token, ptr, 4, ptr, 32))
+        (bool status, bytes memory data) = _token.staticcall(abi.encodeWithSelector(ITokenDetails.name.selector));
+        if (!status) {
+            (status, data) = _token.staticcall(abi.encodeWithSelector(ITokenDetails.NAME.selector));
+            if (!status) {
+                return "";
             }
-
-            mstore(0x40, add(ptr, returndatasize()))
-
-            switch gt(returndatasize(), 32)
-                case 1 {
-                    returndatacopy(mload(0x40), 32, 32) // string length
-                    size := mload(mload(0x40))
-                }
-                default {
-                    size := returndatasize() // 32 or 0
-                }
         }
-        string memory res = new string(size);
-        assembly {
-            if gt(returndatasize(), 32) {
-                // load as string
-                returndatacopy(add(res, 32), 64, size)
-            }
-            /* solhint-disable */
-            if and(gt(returndatasize(), 0), lt(returndatasize(), 33)) {
-                let i := 0
-                ptr := mload(ptr) // load bytes32 value
-                mstore(add(res, 32), ptr) // save value in result string
-
-                for { } gt(ptr, 0) { i := add(i, 1) } { // until string is empty
-                    ptr := shl(8, ptr) // shift left by one symbol
-                }
-                mstore(res, i) // save result string length
-            }
-            /* solhint-enable */
-        }
-        return res;
+        return _convertToString(data);
     }
 
     /**
@@ -64,47 +42,14 @@ library TokenReader {
      * @return token symbol as a string or an empty string if none of the methods succeeded.
      */
     function readSymbol(address _token) internal view returns (string memory) {
-        uint256 ptr;
-        uint256 size;
-        assembly {
-            ptr := mload(0x40)
-            mstore(ptr, 0x95d89b4100000000000000000000000000000000000000000000000000000000) // symbol()
-            if iszero(staticcall(gas(), _token, ptr, 4, ptr, 32)) {
-                mstore(ptr, 0xf76f8d7800000000000000000000000000000000000000000000000000000000) // SYMBOL()
-                pop(staticcall(gas(), _token, ptr, 4, ptr, 32))
+        (bool status, bytes memory data) = _token.staticcall(abi.encodeWithSelector(ITokenDetails.symbol.selector));
+        if (!status) {
+            (status, data) = _token.staticcall(abi.encodeWithSelector(ITokenDetails.SYMBOL.selector));
+            if (!status) {
+                return "";
             }
-
-            mstore(0x40, add(ptr, returndatasize()))
-
-            switch gt(returndatasize(), 32)
-                case 1 {
-                    returndatacopy(mload(0x40), 32, 32) // string length
-                    size := mload(mload(0x40))
-                }
-                default {
-                    size := returndatasize() // 32 or 0
-                }
         }
-        string memory res = new string(size);
-        assembly {
-            if gt(returndatasize(), 32) {
-                // load as string
-                returndatacopy(add(res, 32), 64, size)
-            }
-            /* solhint-disable */
-            if and(gt(returndatasize(), 0), lt(returndatasize(), 33)) {
-                let i := 0
-                ptr := mload(ptr) // load bytes32 value
-                mstore(add(res, 32), ptr) // save value in result string
-
-                for { } gt(ptr, 0) { i := add(i, 1) } { // until string is empty
-                    ptr := shl(8, ptr) // shift left by one symbol
-                }
-                mstore(res, i) // save result string length
-            }
-            /* solhint-enable */
-        }
-        return res;
+        return _convertToString(data);
     }
 
     /**
@@ -114,19 +59,41 @@ library TokenReader {
      * @return token decimals or 0 if none of the methods succeeded.
      */
     function readDecimals(address _token) internal view returns (uint256) {
-        uint256 decimals;
-        assembly {
-            let ptr := mload(0x40)
-            mstore(0x40, add(ptr, 32))
-            mstore(ptr, 0x313ce56700000000000000000000000000000000000000000000000000000000) // decimals()
-            if iszero(staticcall(gas(), _token, ptr, 4, ptr, 32)) {
-                mstore(ptr, 0x2e0f262500000000000000000000000000000000000000000000000000000000) // DECIMALS()
-                if iszero(staticcall(gas(), _token, ptr, 4, ptr, 32)) {
-                    mstore(ptr, 0)
-                }
+        (bool status, bytes memory data) = _token.staticcall(abi.encodeWithSelector(ITokenDetails.decimals.selector));
+        if (!status) {
+            (status, data) = _token.staticcall(abi.encodeWithSelector(ITokenDetails.DECIMALS.selector));
+            if (!status) {
+                return 0;
             }
-            decimals := mload(ptr)
         }
-        return decimals;
+        return abi.decode(data, (uint256));
+    }
+
+    /**
+     * @dev Internal function for converting returned value of name()/symbol() from bytes32/string to string.
+     * @param returnData data returned by the token contract.
+     * @return string with value obtained from returnData.
+     */
+    function _convertToString(bytes memory returnData) private pure returns (string memory) {
+        if (returnData.length > 32) {
+            return abi.decode(returnData, (string));
+        } else if (returnData.length == 32) {
+            bytes32 data = abi.decode(returnData, (bytes32));
+            string memory res = new string(32);
+            assembly {
+                let len := 0
+                mstore(add(res, 32), data) // save value in result string
+
+                // solhint-disable
+                for { } gt(data, 0) { len := add(len, 1) } { // until string is empty
+                    data := shl(8, data) // shift left by one symbol
+                }
+                // solhint-enable
+                mstore(res, len) // save result string length
+            }
+            return res;
+        } else {
+            return "";
+        }
     }
 }
