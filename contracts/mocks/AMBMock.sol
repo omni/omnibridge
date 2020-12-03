@@ -1,10 +1,10 @@
 pragma solidity 0.7.5;
 
 contract AMBMock {
-    event MockedEvent(bytes32 indexed messageId, bytes encodedData);
+    event MockedEvent(bytes32 indexed messageId, address executor, uint8 dataType, bytes data);
 
     address public messageSender;
-    uint256 public maxGasPerTx;
+    uint256 public immutable maxGasPerTx;
     bytes32 public transactionHash;
     bytes32 public messageId;
     uint256 public nonce;
@@ -14,8 +14,8 @@ contract AMBMock {
     mapping(bytes32 => address) public failedMessageReceiver;
     mapping(bytes32 => bytes32) public failedMessageDataHash;
 
-    function setMaxGasPerTx(uint256 _value) public {
-        maxGasPerTx = _value;
+    constructor() {
+        maxGasPerTx = 1000000;
     }
 
     function executeMessageCall(
@@ -61,8 +61,8 @@ contract AMBMock {
 
     function _sendMessage(
         address _contract,
-        bytes memory _data,
-        uint256 _gas,
+        bytes calldata _data,
+        uint256,
         uint256 _dataType
     ) internal returns (bytes32) {
         require(messageId == bytes32(0));
@@ -72,21 +72,8 @@ contract AMBMock {
 
         bytes32 _messageId = bytes32(uint256(0x11223344 << 224)) | bridgeId | bytes32(nonce);
         nonce += 1;
-        bytes memory eventData =
-            abi.encodePacked(
-                _messageId,
-                msg.sender,
-                _contract,
-                uint32(_gas),
-                uint8(2),
-                uint8(2),
-                uint8(_dataType),
-                uint16(1337),
-                uint16(1338),
-                _data
-            );
 
-        emit MockedEvent(_messageId, eventData);
+        emit MockedEvent(_messageId, _contract, uint8(_dataType), _data);
         return _messageId;
     }
 

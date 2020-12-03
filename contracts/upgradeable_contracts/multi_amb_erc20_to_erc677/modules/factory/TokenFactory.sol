@@ -25,6 +25,7 @@ contract TokenFactory is OwnableModule {
      * @param _tokenImage address of the new token image used for further deployments.
      */
     function setTokenImage(address _tokenImage) external onlyOwner {
+        require(Address.isContract(_tokenImage));
         tokenImage = _tokenImage;
     }
 
