@@ -53,18 +53,21 @@ abstract contract BasicMultiAMBErc20ToErc677 is
         address _recipient,
         uint256 _value
     ) external onlyMediator {
-        string memory name = _name;
-        string memory symbol = _symbol;
-        require(bytes(name).length > 0 || bytes(symbol).length > 0);
-        if (bytes(name).length == 0) {
-            name = symbol;
-        } else if (bytes(symbol).length == 0) {
-            symbol = name;
+        address bridgedToken = bridgedTokenAddress(_token);
+        if (bridgedToken == address(0)) {
+            string memory name = _name;
+            string memory symbol = _symbol;
+            require(bytes(name).length > 0 || bytes(symbol).length > 0);
+            if (bytes(name).length == 0) {
+                name = symbol;
+            } else if (bytes(symbol).length == 0) {
+                symbol = name;
+            }
+            name = _transformName(name);
+            bridgedToken = tokenFactory().deploy(name, symbol, _decimals, bridgeContract().sourceChainId());
+            _setTokenAddressPair(_token, bridgedToken);
+            _initToken(bridgedToken, _decimals);
         }
-        name = _transformName(name);
-        address bridgedToken = tokenFactory().deploy(name, symbol, _decimals, bridgeContract().sourceChainId());
-        _setTokenAddressPair(_token, bridgedToken);
-        _initToken(bridgedToken, _decimals);
 
         _handleTokens(bridgedToken, false, _recipient, _value);
     }
