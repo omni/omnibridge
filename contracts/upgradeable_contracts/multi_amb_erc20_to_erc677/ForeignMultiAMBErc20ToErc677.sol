@@ -48,6 +48,17 @@ contract ForeignMultiAMBErc20ToErc677 is BasicMultiAMBErc20ToErc677 {
     }
 
     /**
+     * One-time function to be used together with upgradeToAndCall method.
+     * Sets the token factory contract.
+     * @param _tokenFactory address of the deployed TokenFactory contract.
+     */
+    function upgradeToReverseMode(address _tokenFactory) external {
+        require(msg.sender == address(this));
+
+        _setTokenFactory(_tokenFactory);
+    }
+
+    /**
      * @dev Handles the bridged tokens.
      * Checks that the value is inside the execution limits and invokes the Mint or Unlock accordingly.
      * @param _token token contract address on this side of the bridge.

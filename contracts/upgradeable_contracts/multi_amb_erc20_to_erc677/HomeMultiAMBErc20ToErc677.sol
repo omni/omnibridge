@@ -64,6 +64,27 @@ contract HomeMultiAMBErc20ToErc677 is
     }
 
     /**
+     * One-time function to be used together with upgradeToAndCall method.
+     * Sets the token factory contract. Resumes token bridging in the home to foreign direction.
+     * @param _tokenFactory address of the deployed TokenFactory contract.
+     * @param _forwardingRulesManager address of the deployed MultiTokenForwardingRulesManager contract.
+     * @param _dailyLimit default daily limits used before stopping the bridge operation.
+     */
+    function upgradeToReverseMode(
+        address _tokenFactory,
+        address _forwardingRulesManager,
+        uint256 _dailyLimit
+    ) external {
+        require(msg.sender == address(this));
+
+        _setTokenFactory(_tokenFactory);
+        _setForwardingRulesManager(_forwardingRulesManager);
+
+        uintStorage[keccak256(abi.encodePacked("dailyLimit", address(0)))] = _dailyLimit;
+        emit DailyLimitChanged(address(0), _dailyLimit);
+    }
+
+    /**
      * @dev Alias for bridgedTokenAddress for interface compatibility with the prior version of the Home mediator.
      * @param _foreignToken address of the native token contract on the other side.
      * @return address of the deployed bridged token contract.
