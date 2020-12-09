@@ -1,7 +1,7 @@
 pragma solidity 0.7.5;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "../../../../upgradeability/EternalStorage.sol";
+import "../../../upgradeability/EternalStorage.sol";
 
 /**
  * @title MediatorBalanceStorage

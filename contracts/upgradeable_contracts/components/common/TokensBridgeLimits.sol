@@ -1,8 +1,8 @@
 pragma solidity 0.7.5;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "../../../../upgradeability/EternalStorage.sol";
-import "../../../Ownable.sol";
+import "../../../upgradeability/EternalStorage.sol";
+import "../../Ownable.sol";
 
 /**
  * @title TokensBridgeLimits

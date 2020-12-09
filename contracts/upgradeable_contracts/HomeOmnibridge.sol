@@ -1,19 +1,15 @@
 pragma solidity 0.7.5;
 
-import "./BasicMultiAMBErc20ToErc677.sol";
-import "./HomeFeeManagerMultiAMBErc20ToErc677.sol";
+import "./BasicOmnibridge.sol";
+import "./HomeOmnibridgeFeeManager.sol";
 import "./modules/forwarding_rules/MultiTokenForwardingRulesConnector.sol";
 
 /**
- * @title HomeMultiAMBErc20ToErc677
- * @dev Home side implementation for universal multi-erc20-to-erc677 mediator intended to work on top of AMB bridge.
+ * @title HomeOmnibridge
+ * @dev Home side implementation for multi-token mediator intended to work on top of AMB bridge.
  * It is designed to be used as an implementation contract of EternalStorageProxy contract.
  */
-contract HomeMultiAMBErc20ToErc677 is
-    BasicMultiAMBErc20ToErc677,
-    HomeFeeManagerMultiAMBErc20ToErc677,
-    MultiTokenForwardingRulesConnector
-{
+contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiTokenForwardingRulesConnector {
     using SafeMath for uint256;
     using SafeERC20 for IERC677;
 

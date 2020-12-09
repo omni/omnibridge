@@ -30,15 +30,15 @@ In order to initiate the request the ERC20 tokens can be sent using two differen
 First transfer of any ERC20 token:
 ```=
 >>Mediator
-ForeignMultiAMBErc20ToErc677::onTokenTransfer/relayTokens
-..ForeignMultiAMBErc20ToErc677::bridgeSpecificActionsOnTokenTransfer
+ForeignOmnibridge::onTokenTransfer/relayTokens
+..ForeignOmnibridge::bridgeSpecificActionsOnTokenTransfer
 ....TokensBridgeLimits::isTokenRegistered -> false
 ....TokenReader::readDecimals
-....BasicMultiAMBErc20ToErc677::_initToken
+....BasicOmnibridge::_initToken
 ......TokensBridgeLimits::_initializeTokenBridgeLimits
 ....TokensBridgeLimits::withinLimit
 ....TokensBridgeLimits::addTotalSpentPerDay
-....BasicMultiAMBErc20ToErc677::_prepareMessage
+....BasicOmnibridge::_prepareMessage
 ......TokenReader::readName
 ......TokenReader::readSymbol
 ......MediatorBalanceStorage::_setMediatorBalance
@@ -47,7 +47,7 @@ ForeignMultiAMBErc20ToErc677::onTokenTransfer/relayTokens
 ......ForeignAMB::emitEventOnMessageRequest
 ........emit UserRequestForAffirmation
 >>Mediator
-....BasicMultiAMBErc20ToErc677::_recordBridgeOperation
+....BasicOmnibridge::_recordBridgeOperation
 ......BridgeOperationsStorage::setMessageToken
 ......BridgeOperationsStorage::setMessageRecipient
 ......BridgeOperationsStorage::setMessageValue
@@ -58,20 +58,20 @@ ForeignMultiAMBErc20ToErc677::onTokenTransfer/relayTokens
 Subsequent ERC20 transfers:
 ```=
 >>Mediator
-ForeignMultiAMBErc20ToErc677::onTokenTransfer/relayTokens
-..ForeignMultiAMBErc20ToErc677::bridgeSpecificActionsOnTokenTransfer
+ForeignOmnibridge::onTokenTransfer/relayTokens
+..ForeignOmnibridge::bridgeSpecificActionsOnTokenTransfer
 ....TokensBridgeLimits::isTokenRegistered -> true
 ....NativeTokensRegistry::isRegisteredAsNativeToken -> false
 ....TokensBridgeLimits::withinLimit
 ....TokensBridgeLimits::addTotalSpentPerDay
-....BasicMultiAMBErc20ToErc677::_prepareMessage
+....BasicOmnibridge::_prepareMessage
 ......MediatorBalanceStorage::_setMediatorBalance
 >>Bridge
 ....MessageDelivery::requireToPassMessage
 ......ForeignAMB::emitEventOnMessageRequest
 ........emit UserRequestForAffirmation
 >>Mediator
-....BasicMultiAMBErc20ToErc677::_recordBridgeOperation
+....BasicOmnibridge::_recordBridgeOperation
 ......BridgeOperationsStorage::setMessageToken
 ......BridgeOperationsStorage::setMessageRecipient
 ......BridgeOperationsStorage::setMessageValue
@@ -92,19 +92,19 @@ BasicHomeAMB::executeAffirmation
 ........MessageProcessor::setMessageSender
 ........MessageProcessor::setMessageId
 >>Mediator
-........BasicMultiAMBErc20ToErc677::deployAndHandleBridgedTokens
-..........HomeMultiAMBErc20ToErc677::_transformName
+........BasicOmnibridge::deployAndHandleBridgedTokens
+..........HomeOmnibridge::_transformName
 ..........TokenFactory::deploy
-..........BasicMultiAMBErc20ToErc677::_setTokenAddressPair
-..........HomeMultiAMBErc20ToErc677::_initToken
+..........BasicOmnibridge::_setTokenAddressPair
+..........HomeOmnibridge::_initToken
 ............TokensBridgeLimits::_initializeTokenBridgeLimits
-............HomeFeeManagerMultiAMBErc20ToErc677::_setFee
-............HomeFeeManagerMultiAMBErc20ToErc677::_setFee
-..........HomeMultiAMBErc20ToErc677::_handleTokens
+............HomeOmnibridgeFeeManager::_setFee
+............HomeOmnibridgeFeeManager::_setFee
+..........HomeOmnibridge::_handleTokens
 ............TokensBridgeLimits::withinExecutionLimit
 ............TokensBridgeLimits::addTotalExecutedPerDay
-............HomeFeeManagerMultiAMBErc20ToErc677::_distributeFee
-..............HomeFeeManagerMultiAMBErc20ToErc677::calculateFee
+............HomeOmnibridgeFeeManager::_distributeFee
+..............HomeOmnibridgeFeeManager::calculateFee
 ..............IBurnableMintableERC677Token::mint
 ............MessageProcessor::messageId
 ............emit FeeDistributed
@@ -127,14 +127,14 @@ BasicHomeAMB::executeAffirmation
 ........MessageProcessor::setMessageSender
 ........MessageProcessor::setMessageId
 >>Mediator
-........BasicMultiAMBErc20ToErc677::handleBridgedTokens
+........BasicOmnibridge::handleBridgedTokens
 ..........BridgedTokenRegistry::bridgedTokenAddress
 ..........TokensBridgeLimits::isTokenRegistered
-..........HomeMultiAMBErc20ToErc677::_handleTokens
+..........HomeOmnibridge::_handleTokens
 ............TokensBridgeLimits::withinExecutionLimit
 ............TokensBridgeLimits::addTotalExecutedPerDay
-............HomeFeeManagerMultiAMBErc20ToErc677::_distributeFee
-..............HomeFeeManagerMultiAMBErc20ToErc677::calculateFee
+............HomeOmnibridgeFeeManager::_distributeFee
+..............HomeOmnibridgeFeeManager::calculateFee
 ..............IBurnableMintableERC677Token::mint
 ............MessageProcessor::messageId
 ............emit FeeDistributed
@@ -162,19 +162,19 @@ However, the way of first approving tokens and then calling `relayTokens` also w
 
 ```=
 >>Mediator
-HomeMultiAMBErc20ToErc677::onTokenTransfer/relayTokens
-..HomeMultiAMBErc20ToErc677::bridgeSpecificActionsOnTokenTransfer
+HomeOmnibridge::onTokenTransfer/relayTokens
+..HomeOmnibridge::bridgeSpecificActionsOnTokenTransfer
 ....TokensBridgeLimits::isTokenRegistered -> true
 ....NativeTokensRegistry::isRegisteredAsNativeToken -> false
 ....TokensBridgeLimits::withinLimit
 ....TokensBridgeLimits::addTotalSpentPerDay
-....HomeFeeManagerMultiAMBErc20ToErc677::isRewardAddress
-....HomeFeeManagerMultiAMBErc20ToErc677::_distributeFee
-......HomeFeeManagerMultiAMBErc20ToErc677::calculateFee
+....HomeOmnibridgeFeeManager::isRewardAddress
+....HomeOmnibridgeFeeManager::_distributeFee
+......HomeOmnibridgeFeeManager::calculateFee
 ......IERC677::transfer
-....BasicMultiAMBErc20ToErc677::_prepareMessage
+....BasicOmnibridge::_prepareMessage
 ......IBurnableMintableERC677Token::burn
-....HomeMultiAMBErc20ToErc677::_passMessage
+....HomeOmnibridge::_passMessage
 ......MultiTokenForwardingRulesConnector::_isOracleDrivenLaneAllowed
 ........MultiTokenForwardingRulesManager::destinationLane
 >>Bridge
@@ -182,7 +182,7 @@ HomeMultiAMBErc20ToErc677::onTokenTransfer/relayTokens
 ........HomeAMB::emitEventOnMessageRequest
 ..........emit UserRequestForSignature
 >>Mediator
-....BasicMultiAMBErc20ToErc677::_recordBridgeOperation
+....BasicOmnibridge::_recordBridgeOperation
 ......BridgeOperationsStorage::setMessageToken
 ......BridgeOperationsStorage::setMessageRecipient
 ......BridgeOperationsStorage::setMessageValue
@@ -201,9 +201,9 @@ BasicForeignAMB::executeSignatures
 ........MessageProcessor::setMessageSender
 ........MessageProcessor::setMessageId
 >>Mediator
-........BasicMultiAMBErc20ToErc677::handleNativeTokens
+........BasicOmnibridge::handleNativeTokens
 ..........NativeTokensRegistry::isRegisteredAsNativeToken -> true
-..........ForeignMultiAMBErc20ToErc677::_handleTokens
+..........ForeignOmnibridge::_handleTokens
 ............TokensBridgeLimits::withinExecutionLimit
 ............TokensBridgeLimits::addTotalExecutedPerDay
 ............SafeERC20::safeTransfer
@@ -235,19 +235,19 @@ In order to initiate the request the ERC20 tokens can be sent using two differen
 First transfer of any ERC20 token:
 ```=
 >>Mediator
-HomeMultiAMBErc20ToErc677::onTokenTransfer/relayTokens
-..HomeMultiAMBErc20ToErc677::bridgeSpecificActionsOnTokenTransfer
+HomeOmnibridge::onTokenTransfer/relayTokens
+..HomeOmnibridge::bridgeSpecificActionsOnTokenTransfer
 ....TokensBridgeLimits::isTokenRegistered -> false
 ....TokenReader::readDecimals
-....BasicMultiAMBErc20ToErc677::_initToken
+....BasicOmnibridge::_initToken
 ......TokensBridgeLimits::_initializeTokenBridgeLimits
 ....TokensBridgeLimits::withinLimit
 ....TokensBridgeLimits::addTotalSpentPerDay
-....HomeFeeManagerMultiAMBErc20ToErc677::isRewardAddress
-....HomeFeeManagerMultiAMBErc20ToErc677::_distributeFee
-......HomeFeeManagerMultiAMBErc20ToErc677::calculateFee
+....HomeOmnibridgeFeeManager::isRewardAddress
+....HomeOmnibridgeFeeManager::_distributeFee
+......HomeOmnibridgeFeeManager::calculateFee
 ......SafeERC20::safeTransfer
-....BasicMultiAMBErc20ToErc677::_prepareMessage
+....BasicOmnibridge::_prepareMessage
 ......TokenReader::readName
 ......TokenReader::readSymbol
 ......MediatorBalanceStorage::_setMediatorBalance
@@ -256,7 +256,7 @@ HomeMultiAMBErc20ToErc677::onTokenTransfer/relayTokens
 ......ForeignAMB::emitEventOnMessageRequest
 ........emit UserRequestForSignature
 >>Mediator
-....BasicMultiAMBErc20ToErc677::_recordBridgeOperation
+....BasicOmnibridge::_recordBridgeOperation
 ......BridgeOperationsStorage::setMessageToken
 ......BridgeOperationsStorage::setMessageRecipient
 ......BridgeOperationsStorage::setMessageValue
@@ -267,24 +267,24 @@ HomeMultiAMBErc20ToErc677::onTokenTransfer/relayTokens
 Subsequent ERC20 transfers:
 ```=
 >>Mediator
-HomeMultiAMBErc20ToErc677::onTokenTransfer/relayTokens
-..HomeMultiAMBErc20ToErc677::bridgeSpecificActionsOnTokenTransfer
+HomeOmnibridge::onTokenTransfer/relayTokens
+..HomeOmnibridge::bridgeSpecificActionsOnTokenTransfer
 ....TokensBridgeLimits::isTokenRegistered -> true
 ....NativeTokensRegistry::isRegisteredAsNativeToken -> true
 ....TokensBridgeLimits::withinLimit
 ....TokensBridgeLimits::addTotalSpentPerDay
-....HomeFeeManagerMultiAMBErc20ToErc677::isRewardAddress
-....HomeFeeManagerMultiAMBErc20ToErc677::_distributeFee
-......HomeFeeManagerMultiAMBErc20ToErc677::calculateFee
+....HomeOmnibridgeFeeManager::isRewardAddress
+....HomeOmnibridgeFeeManager::_distributeFee
+......HomeOmnibridgeFeeManager::calculateFee
 ......SafeERC20::safeTransfer
-....BasicMultiAMBErc20ToErc677::_prepareMessage
+....BasicOmnibridge::_prepareMessage
 ......MediatorBalanceStorage::_setMediatorBalance
 >>Bridge
 ....MessageDelivery::requireToPassMessage
 ......ForeignAMB::emitEventOnMessageRequest
 ........emit UserRequestForSignature
 >>Mediator
-....BasicMultiAMBErc20ToErc677::_recordBridgeOperation
+....BasicOmnibridge::_recordBridgeOperation
 ......BridgeOperationsStorage::setMessageToken
 ......BridgeOperationsStorage::setMessageRecipient
 ......BridgeOperationsStorage::setMessageValue
@@ -304,13 +304,13 @@ BasicForeignAMB::executeSignatures
 ........MessageProcessor::setMessageSender
 ........MessageProcessor::setMessageId
 >>Mediator
-........BasicMultiAMBErc20ToErc677::deployAndHandleBridgedTokens
-..........ForeignMultiAMBErc20ToErc677::_transformName
+........BasicOmnibridge::deployAndHandleBridgedTokens
+..........ForeignOmnibridge::_transformName
 ..........TokenFactory::deploy
-..........BasicMultiAMBErc20ToErc677::_setTokenAddressPair
-..........ForeignMultiAMBErc20ToErc677::_initToken
+..........BasicOmnibridge::_setTokenAddressPair
+..........ForeignOmnibridge::_initToken
 ............TokensBridgeLimits::_initializeTokenBridgeLimits
-..........ForeignMultiAMBErc20ToErc677::_handleTokens
+..........ForeignOmnibridge::_handleTokens
 ............TokensBridgeLimits::withinExecutionLimit
 ............TokensBridgeLimits::addTotalExecutedPerDay
 ............IBurnableMintableERC677Token::mint
@@ -332,10 +332,10 @@ BasicForeignAMB::executeSignatures
 ........MessageProcessor::setMessageSender
 ........MessageProcessor::setMessageId
 >>Mediator
-........BasicMultiAMBErc20ToErc677::handleBridgedTokens
+........BasicOmnibridge::handleBridgedTokens
 ..........BridgedTokenRegistry::bridgedTokenAddress
 ..........TokensBridgeLimits::isTokenRegistered
-..........ForeignMultiAMBErc20ToErc677::_handleTokens
+..........ForeignOmnibridge::_handleTokens
 ............TokensBridgeLimits::withinExecutionLimit
 ............TokensBridgeLimits::addTotalExecutedPerDay
 ............IBurnableMintableERC677Token::mint
@@ -363,20 +363,20 @@ However, the way of first approving tokens and then calling `relayTokens` also w
 
 ```=
 >>Mediator
-ForeignMultiAMBErc20ToErc677::onTokenTransfer/relayTokens
-..ForeignMultiAMBErc20ToErc677::bridgeSpecificActionsOnTokenTransfer
+ForeignOmnibridge::onTokenTransfer/relayTokens
+..ForeignOmnibridge::bridgeSpecificActionsOnTokenTransfer
 ....TokensBridgeLimits::isTokenRegistered -> true
 ....NativeTokensRegistry::isRegisteredAsNativeToken -> false
 ....TokensBridgeLimits::withinLimit
 ....TokensBridgeLimits::addTotalSpentPerDay
-....BasicMultiAMBErc20ToErc677::_prepareMessage
+....BasicOmnibridge::_prepareMessage
 ......IBurnableMintableERC677Token::burn
 >>Bridge
 ....MessageDelivery::requireToPassMessage
 ......ForeignAMB::emitEventOnMessageRequest
 ........emit UserRequestForAffirmation
 >>Mediator
-....BasicMultiAMBErc20ToErc677::_recordBridgeOperation
+....BasicOmnibridge::_recordBridgeOperation
 ......BridgeOperationsStorage::setMessageToken
 ......BridgeOperationsStorage::setMessageRecipient
 ......BridgeOperationsStorage::setMessageValue
@@ -395,13 +395,13 @@ BasicHomeAMB::executeAffirmation
 ........MessageProcessor::setMessageSender
 ........MessageProcessor::setMessageId
 >>Mediator
-........BasicMultiAMBErc20ToErc677::handleNativeTokens
+........BasicOmnibridge::handleNativeTokens
 ..........NativeTokensRegistry::isRegisteredAsNativeToken -> true
-..........HomeMultiAMBErc20ToErc677::_handleTokens
+..........HomeOmnibridge::_handleTokens
 ............TokensBridgeLimits::withinExecutionLimit
 ............TokensBridgeLimits::addTotalExecutedPerDay
-............HomeFeeManagerMultiAMBErc20ToErc677::_distributeFee
-..............HomeFeeManagerMultiAMBErc20ToErc677::calculateFee
+............HomeOmnibridgeFeeManager::_distributeFee
+..............HomeOmnibridgeFeeManager::calculateFee
 ..............IBurnableMintableERC677Token::mint
 ............MessageProcessor::messageId
 ............emit FeeDistributed
@@ -448,7 +448,7 @@ BasicForeignAMB::executeSignatures
 ........MessageProcessor::setMessageSender
 ........MessageProcessor::setMessageId
 >>Mediator
-........[failed ForeignMultiAMBErc20ToErc677::deployAndHandleBridgedTokens/handleBridgedTokens/handleNativeTokens]
+........[failed ForeignOmnibridge::deployAndHandleBridgedTokens/handleBridgedTokens/handleNativeTokens]
 >>Bridge
 ......MessageProcessor::setMessageCallStatus
 ......MessageProcessor::setFailedMessageReceiver
@@ -496,7 +496,7 @@ BasicHomeAMB::executeAffirmation
 ..........MultiTokenBridgeMediator::messageRecipient
 ..........MultiTokenBridgeMediator::messageValue
 ..........MultiTokenBridgeMediator::setMessageFixed
-..........BasicMultiAMBErc20ToErc677::executeActionOnFixedTokens
+..........BasicOmnibridge::executeActionOnFixedTokens
 ............NativeTokensRegistry::tokenRegistrationMessageId
 ............SafeERC20::safeTransfer/IBurnableMintableERC677Token::mint
 ..............<######>
@@ -523,7 +523,7 @@ BasicHomeAMB::executeAffirmation
 ........MessageProcessor::setMessageSender
 ........MessageProcessor::setMessageId
 >>Mediator
-........[failed HomeMultiAMBErc20ToErc677::deployAndHandleBridgedTokens/handleBridgedTokens/handleNativeTokens]
+........[failed HomeOmnibridge::deployAndHandleBridgedTokens/handleBridgedTokens/handleNativeTokens]
 >>Bridge
 ......MessageProcessor::setMessageCallStatus
 ......MessageProcessor::setFailedMessageReceiver
@@ -569,7 +569,7 @@ BasicForeignAMB::executeSignatures
 ..........MultiTokenBridgeMediator::messageToken
 ..........MultiTokenBridgeMediator::messageRecipient
 ..........MultiTokenBridgeMediator::messageValue
-..........BasicMultiAMBErc20ToErc677::executeActionOnFixedTokens
+..........BasicOmnibridge::executeActionOnFixedTokens
 ............NativeTokensRegistry::tokenRegistrationMessageId
 ............SafeERC20::safeTransfer/IBurnableMintableERC677Token::mint
 ..............<######>

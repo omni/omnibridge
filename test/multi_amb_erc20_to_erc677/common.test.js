@@ -1,5 +1,5 @@
-const HomeMultiAMBErc20ToErc677 = artifacts.require('HomeMultiAMBErc20ToErc677')
-const ForeignMultiAMBErc20ToErc677 = artifacts.require('ForeignMultiAMBErc20ToErc677')
+const HomeOmnibridge = artifacts.require('HomeOmnibridge')
+const ForeignOmnibridge = artifacts.require('ForeignOmnibridge')
 const EternalStorageProxy = artifacts.require('EternalStorageProxy')
 const AMBMock = artifacts.require('AMBMock')
 const Sacrifice = artifacts.require('Sacrifice')
@@ -24,7 +24,7 @@ const otherMessageId = '0x35d3818e50234655f6aebb2a1cfbf30f59568d8a4ec72066fac5a2
 const failedMessageId = '0x2ebc2ccc755acc8eaf9252e19573af708d644ab63a39619adb080a3500a4ff2e'
 
 function runTests(accounts, isHome) {
-  const Mediator = isHome ? HomeMultiAMBErc20ToErc677 : ForeignMultiAMBErc20ToErc677
+  const Mediator = isHome ? HomeOmnibridge : ForeignOmnibridge
   const modifyName = (name) => name + (isHome ? ' on xDai' : ' on Mainnet')
   const otherSideMediator = '0x1e33FBB006F47F78704c954555a5c52C2A7f409D'
   const otherSideToken1 = '0xAfb77d544aFc1e2aD3dEEAa20F3c80859E7Fc3C9'
@@ -1704,10 +1704,10 @@ function runTests(accounts, isHome) {
   }
 }
 
-contract('ForeignMultiAMBErc20ToErc677', (accounts) => {
+contract('ForeignOmnibridge', (accounts) => {
   runTests(accounts, false)
 })
 
-contract('HomeMultiAMBErc20ToErc677', (accounts) => {
+contract('HomeOmnibridge', (accounts) => {
   runTests(accounts, true)
 })

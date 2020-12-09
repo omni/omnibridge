@@ -1,13 +1,13 @@
 pragma solidity 0.7.5;
 
-import "./BasicMultiAMBErc20ToErc677.sol";
+import "./BasicOmnibridge.sol";
 
 /**
- * @title ForeignMultiAMBErc20ToErc677
- * @dev Foreign side implementation for multi-erc20-to-erc677 mediator intended to work on top of AMB bridge.
+ * @title ForeignOmnibridge
+ * @dev Foreign side implementation for multi-token mediator intended to work on top of AMB bridge.
  * It is designed to be used as an implementation contract of EternalStorageProxy contract.
  */
-contract ForeignMultiAMBErc20ToErc677 is BasicMultiAMBErc20ToErc677 {
+contract ForeignOmnibridge is BasicOmnibridge {
     using SafeERC20 for IERC677;
     using SafeMath for uint256;
 

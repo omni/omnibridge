@@ -2,12 +2,7 @@ const { web3Home, deploymentAddress } = require('../web3')
 const { deployContract, upgradeProxy } = require('../deploymentUtils')
 const { HOME_ERC677_TOKEN_IMAGE, HOME_TOKEN_FACTORY, HOME_BRIDGE_OWNER } = require('../loadEnv')
 
-const {
-  EternalStorageProxy,
-  HomeMultiAMBErc20ToErc677: HomeBridge,
-  PermittableToken,
-  TokenFactory,
-} = require('../loadContracts')
+const { EternalStorageProxy, HomeOmnibridge, PermittableToken, TokenFactory } = require('../loadContracts')
 
 async function deployHome() {
   let nonce = await web3Home.eth.getTransactionCount(deploymentAddress)
@@ -43,7 +38,7 @@ async function deployHome() {
   }
 
   console.log('\n[Home] Deploying Bridge Mediator implementation\n')
-  const homeBridgeImplementation = await deployContract(HomeBridge, [], {
+  const homeBridgeImplementation = await deployContract(HomeOmnibridge, [], {
     nonce: nonce++,
   })
   console.log('[Home] Bridge Mediator Implementation: ', homeBridgeImplementation.options.address)
@@ -56,7 +51,7 @@ async function deployHome() {
     nonce: nonce++,
   })
 
-  console.log('\nHome part of MULTI_AMB_ERC20_TO_ERC677 bridge deployed\n')
+  console.log('\nHome part of OMNIBRIDGE has been deployed\n')
   return {
     homeBridgeMediator: { address: homeBridgeStorage.options.address },
     tokenFactory: { address: tokenFactory },

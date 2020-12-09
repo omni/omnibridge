@@ -11,12 +11,12 @@ function writeDeploymentResults(data) {
   console.log('Contracts Deployment have been saved to `bridgeDeploymentResults.json`')
 }
 
-async function deployMultiAMBErcToErc() {
-  const preDeploy = require('./src/multi_amb_erc20_to_erc677/preDeploy')
-  const deployHome = require('./src/multi_amb_erc20_to_erc677/home')
-  const deployForeign = require('./src/multi_amb_erc20_to_erc677/foreign')
-  const initializeHome = require('./src/multi_amb_erc20_to_erc677/initializeHome')
-  const initializeForeign = require('./src/multi_amb_erc20_to_erc677/initializeForeign')
+async function deployOmnibridge() {
+  const preDeploy = require('./src/omnibridge/preDeploy')
+  const deployHome = require('./src/omnibridge/home')
+  const deployForeign = require('./src/omnibridge/foreign')
+  const initializeHome = require('./src/omnibridge/initializeHome')
+  const initializeForeign = require('./src/omnibridge/initializeForeign')
   await preDeploy()
   const { homeBridgeMediator, tokenFactory: homeTokenFactory } = await deployHome()
   const { foreignBridgeMediator, tokenFactory: foreignTokenFactory } = await deployForeign()
@@ -49,12 +49,12 @@ async function deployMultiAMBErcToErc() {
 async function main() {
   console.log(`Bridge mode: ${BRIDGE_MODE}`)
   switch (BRIDGE_MODE) {
-    case 'MULTI_AMB_ERC_TO_ERC':
-      await deployMultiAMBErcToErc()
+    case 'OMNIBRIDGE':
+      await deployOmnibridge()
       break
     default:
       console.log(BRIDGE_MODE)
-      throw new Error('Please specify BRIDGE_MODE: MULTI_AMB_ERC_TO_ERC')
+      throw new Error('Please specify BRIDGE_MODE: OMNIBRIDGE')
   }
 }
 

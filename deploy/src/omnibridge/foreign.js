@@ -1,11 +1,6 @@
 const { web3Foreign, deploymentAddress } = require('../web3')
 const { deployContract, upgradeProxy } = require('../deploymentUtils')
-const {
-  EternalStorageProxy,
-  ForeignMultiAMBErc20ToErc677: ForeignBridge,
-  PermittableToken,
-  TokenFactory,
-} = require('../loadContracts')
+const { EternalStorageProxy, ForeignOmnibridge, PermittableToken, TokenFactory } = require('../loadContracts')
 const { FOREIGN_TOKEN_FACTORY, FOREIGN_ERC677_TOKEN_IMAGE, FOREIGN_BRIDGE_OWNER } = require('../loadEnv')
 
 async function deployForeign() {
@@ -45,7 +40,7 @@ async function deployForeign() {
   }
 
   console.log('\n[Foreign] Deploying Bridge Mediator implementation\n')
-  const foreignBridgeImplementation = await deployContract(ForeignBridge, [], {
+  const foreignBridgeImplementation = await deployContract(ForeignOmnibridge, [], {
     network: 'foreign',
     nonce: nonce++,
   })
@@ -60,7 +55,7 @@ async function deployForeign() {
     nonce: nonce++,
   })
 
-  console.log('\nForeign part of MULTI_AMB_ERC20_TO_ERC677 bridge deployed\n')
+  console.log('\nForeign part of OMNIBRIDGE has been deployed\n')
   return {
     foreignBridgeMediator: { address: foreignBridgeStorage.options.address },
     tokenFactory: { address: tokenFactory },

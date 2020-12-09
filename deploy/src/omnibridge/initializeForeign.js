@@ -1,6 +1,6 @@
 const { fromWei } = require('web3').utils
 const { web3Foreign, deploymentAddress } = require('../web3')
-const { EternalStorageProxy, ForeignMultiAMBErc20ToErc677: ForeignBridge } = require('../loadContracts')
+const { EternalStorageProxy, ForeignOmnibridge } = require('../loadContracts')
 const { sendRawTxForeign, transferProxyOwnership } = require('../deploymentUtils')
 
 const {
@@ -57,7 +57,7 @@ async function initializeMediator({
 
 async function initialize({ homeBridge, foreignBridge, tokenFactory }) {
   let nonce = await web3Foreign.eth.getTransactionCount(deploymentAddress)
-  const contract = new web3Foreign.eth.Contract(ForeignBridge.abi, foreignBridge)
+  const contract = new web3Foreign.eth.Contract(ForeignOmnibridge.abi, foreignBridge)
 
   console.log('\n[Foreign] Initializing Bridge Mediator with following parameters:')
 

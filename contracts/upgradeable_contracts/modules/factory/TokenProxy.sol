@@ -1,6 +1,6 @@
 pragma solidity 0.7.5;
 
-import "../../../../upgradeability/Proxy.sol";
+import "../../../upgradeability/Proxy.sol";
 
 interface IPermittableTokenVersion {
     function version() external pure returns (string memory);
@@ -55,7 +55,7 @@ contract TokenProxy is Proxy {
         name = _name;
         symbol = _symbol;
         decimals = _decimals;
-        owner = _owner; // _owner == MultiAMBErc20ToErc677 mediator
+        owner = _owner; // _owner == HomeOmnibridge/ForeignOmnibridge mediator
         bridgeContractAddr = _owner;
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
