@@ -99,6 +99,18 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
     }
 
     /**
+     * @dev One-time upgrade function for transferring ownership of the STAKE token to the TokenMinter address.
+     * Should be called together with upgradeToAndCall function
+     */
+    function transferTokenOwnership() external {
+        require(msg.sender == address(this));
+
+        Ownable(0xb7D311E2Eb55F2f68a9440da38e7989210b9A05e).transferOwnership(
+            0x1111111111111111111111111111111111111111
+        );
+    }
+
+    /**
      * @dev Handles the bridged tokens.
      * Checks that the value is inside the execution limits and invokes the Mint or Unlock accordingly.
      * @param _token token contract address on this side of the bridge.
@@ -127,7 +139,7 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
             IERC677(_token).safeTransfer(_recipient, valueToBridge);
             _setMediatorBalance(_token, mediatorBalance(_token).sub(_value));
         } else {
-            IBurnableMintableERC677Token(_token).mint(_recipient, valueToBridge);
+            _getMinterFor(_token).mint(_recipient, valueToBridge);
         }
 
         emit TokensBridged(_token, _recipient, valueToBridge, _messageId);
@@ -223,5 +235,25 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
      */
     function _transformName(string memory _name) internal pure override returns (string memory) {
         return string(abi.encodePacked(_name, " on xDai"));
+    }
+
+    /**
+     * @dev Internal function for getting minter proxy address.
+     * Returns the token address itself, expect for the case with bridged STAKE token.
+     * For bridged STAKE token, returns the hardcoded TokenMinter contract address.
+     * @param _token address of the token to mint.
+     * @return address of the minter contract that should be used for calling mint(address,uint256)
+     */
+    function _getMinterFor(address _token)
+        internal
+        view
+        override(BasicOmnibridge, HomeOmnibridgeFeeManager)
+        returns (IBurnableMintableERC677Token)
+    {
+        if (_token == address(0xb7D311E2Eb55F2f68a9440da38e7989210b9A05e)) {
+            // hardcoded address of the TokenMinter address
+            return IBurnableMintableERC677Token(0xb7D311E2Eb55F2f68a9440da38e7989210b9A05e);
+        }
+        return IBurnableMintableERC677Token(_token);
     }
 }

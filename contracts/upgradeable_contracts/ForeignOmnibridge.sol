@@ -79,7 +79,7 @@ contract ForeignOmnibridge is BasicOmnibridge {
             IERC677(_token).safeTransfer(_recipient, _value);
             _setMediatorBalance(_token, mediatorBalance(_token).sub(_value));
         } else {
-            IBurnableMintableERC677Token(_token).mint(_recipient, _value);
+            _getMinterFor(_token).mint(_recipient, _value);
         }
 
         emit TokensBridged(_token, _recipient, _value, messageId());

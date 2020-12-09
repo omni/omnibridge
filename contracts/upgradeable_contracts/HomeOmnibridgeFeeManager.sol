@@ -12,7 +12,7 @@ import "./components/common/TokensBridgeLimits.sol";
  * @dev Implements the logic to distribute fees from the multi-token mediator contract operations.
  * The fees are distributed in the form of native tokens to the list of reward accounts.
  */
-contract HomeOmnibridgeFeeManager is BaseRewardAddressList, Ownable, TokensBridgeLimits {
+abstract contract HomeOmnibridgeFeeManager is BaseRewardAddressList, Ownable, TokensBridgeLimits {
     using SafeMath for uint256;
     using SafeERC20 for IERC677;
 
@@ -165,7 +165,7 @@ contract HomeOmnibridgeFeeManager is BaseRewardAddressList, Ownable, TokensBridg
             } else if (_feeType == HOME_TO_FOREIGN_FEE) {
                 IERC677(_token).transfer(nextAddr, feeToDistribute);
             } else {
-                IBurnableMintableERC677Token(_token).mint(nextAddr, feeToDistribute);
+                _getMinterFor(_token).mint(nextAddr, feeToDistribute);
             }
 
             nextAddr = getNextRewardAddress(nextAddr);
@@ -174,4 +174,6 @@ contract HomeOmnibridgeFeeManager is BaseRewardAddressList, Ownable, TokensBridg
         }
         return _fee;
     }
+
+    function _getMinterFor(address _token) internal view virtual returns (IBurnableMintableERC677Token);
 }

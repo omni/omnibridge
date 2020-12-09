@@ -134,7 +134,7 @@ abstract contract BasicOmnibridge is
                 _setTokenRegistrationMessageId(_token, bytes32(0));
             }
         } else {
-            IBurnableMintableERC677Token(_token).mint(_recipient, _value);
+            _getMinterFor(_token).mint(_recipient, _value);
         }
     }
 
@@ -264,6 +264,15 @@ abstract contract BasicOmnibridge is
      */
     function _initToken(address _token, uint8 _decimals) internal virtual {
         _initializeTokenBridgeLimits(_token, _decimals);
+    }
+
+    /**
+     * @dev Internal function for getting minter proxy address.
+     * @param _token address of the token to mint.
+     * @return address of the minter contract that should be used for calling mint(address,uint256)
+     */
+    function _getMinterFor(address _token) internal view virtual returns (IBurnableMintableERC677Token) {
+        return IBurnableMintableERC677Token(_token);
     }
 
     function _handleTokens(
