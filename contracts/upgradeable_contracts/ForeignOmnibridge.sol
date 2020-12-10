@@ -76,8 +76,7 @@ contract ForeignOmnibridge is BasicOmnibridge {
         addTotalExecutedPerDay(_token, getCurrentDay(), _value);
 
         if (_isNative) {
-            IERC677(_token).safeTransfer(_recipient, _value);
-            _setMediatorBalance(_token, mediatorBalance(_token).sub(_value));
+            _releaseTokens(_token, _recipient, _value);
         } else {
             _getMinterFor(_token).mint(_recipient, _value);
         }
@@ -115,6 +114,38 @@ contract ForeignOmnibridge is BasicOmnibridge {
         bytes32 _messageId =
             bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), data, requestGasLimit());
         _recordBridgeOperation(!isKnownToken, _messageId, _token, _from, _value);
+    }
+
+    /**
+     * Internal function for unlocking some amount of tokens.
+     * When bridging STAKE token, the insufficient amount of tokens can be additionally minted.
+     * @param _token address of the token contract.
+     * @param _recipient address of the tokens receiver.
+     * @param _value amount of tokens to unlock.
+     */
+    function _releaseTokens(
+        address _token,
+        address _recipient,
+        uint256 _value
+    ) internal override {
+        uint256 balance = mediatorBalance(_token);
+
+        // STAKE total supply on xDai can be higher than the native STAKE supply on Mainnet
+        // Omnibridge is allowed to mint extra native STAKE tokens.
+        if (_token == address(0x0Ae055097C6d159879521C384F1D2123D1f195e6) && balance < _value) {
+            // if all locked tokens were already withdrawn, mint new tokens directly to receiver
+            // mediatorBalance(STAKE) remains 0 in this case.
+            if (balance == 0) {
+                IBurnableMintableERC677Token(_token).mint(_recipient, _value);
+                return;
+            }
+
+            // otherwise, first mint insufficient tokens to the contract
+            IBurnableMintableERC677Token(_token).mint(address(this), _value - balance);
+            balance = _value;
+        }
+        IERC677(_token).safeTransfer(_recipient, _value);
+        _setMediatorBalance(_token, balance.sub(_value));
     }
 
     /**

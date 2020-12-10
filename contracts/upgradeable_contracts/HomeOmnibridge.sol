@@ -136,6 +136,7 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
         }
 
         if (_isNative) {
+            // not _releaseTokens(_token, _recipient, _value), since valueToBridge < _value
             IERC677(_token).safeTransfer(_recipient, valueToBridge);
             _setMediatorBalance(_token, mediatorBalance(_token).sub(_value));
         } else {

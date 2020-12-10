@@ -123,8 +123,7 @@ abstract contract BasicOmnibridge is
     ) internal override {
         bytes32 registrationMessageId = tokenRegistrationMessageId(_token);
         if (registrationMessageId != bytes32(0)) {
-            IERC677(_token).safeTransfer(_recipient, _value);
-            _setMediatorBalance(_token, mediatorBalance(_token).sub(_value));
+            _releaseTokens(_token, _recipient, _value);
             if (_messageId == registrationMessageId) {
                 delete uintStorage[keccak256(abi.encodePacked("dailyLimit", _token))];
                 delete uintStorage[keccak256(abi.encodePacked("maxPerTx", _token))];
@@ -273,6 +272,21 @@ abstract contract BasicOmnibridge is
      */
     function _getMinterFor(address _token) internal view virtual returns (IBurnableMintableERC677Token) {
         return IBurnableMintableERC677Token(_token);
+    }
+
+    /**
+     * Internal function for unlocking some amount of tokens.
+     * @param _token address of the token contract.
+     * @param _recipient address of the tokens receiver.
+     * @param _value amount of tokens to unlock.
+     */
+    function _releaseTokens(
+        address _token,
+        address _recipient,
+        uint256 _value
+    ) internal virtual {
+        IERC677(_token).safeTransfer(_recipient, _value);
+        _setMediatorBalance(_token, mediatorBalance(_token).sub(_value));
     }
 
     function _handleTokens(
