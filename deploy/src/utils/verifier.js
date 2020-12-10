@@ -8,10 +8,6 @@ const { EXPLORER_TYPES, REQUEST_STATUS } = require('../constants')
 const basePath = path.join(__dirname, '..', '..', '..', 'flats')
 
 const flat = async (contractPath) => {
-  if (contractPath === 'PermittableToken.sol') {
-    const filePath = path.join(basePath, '..', 'precompiled', 'PermittableToken_flat.sol')
-    return fs.readFileSync(filePath).toString()
-  }
   const pathArray = contractPath.split('/')
   const name = pathArray[pathArray.length - 1]
 
