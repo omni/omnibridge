@@ -1,0 +1,50 @@
+version: '3.8'
+services:
+  home:
+    image: trufflesuite/ganache-cli
+    command: --deterministic --chainId 1337 --blockTime 1
+  foreign:
+    image: trufflesuite/ganache-cli
+    command: --deterministic --chainId 1338 --blockTime 1
+  deploy-amb:
+    image: poanetwork/tokenbridge-contracts
+    env_file: local-envs/deploy-amb.env
+    entrypoint: deploy.sh
+  deploy-omni:
+    build: ..
+    env_file: local-envs/deploy-omni.env
+    entrypoint: deploy.sh
+  e2e-tests:
+    build:
+      context: ..
+      dockerfile: Dockerfile.dev
+    env_file: local-envs/tests.env
+    entrypoint: node e2e-tests/run.js
+  rabbit:
+    environment: ['RABBITMQ_NODENAME=node@rabbit']
+    hostname: rabbit
+    image: rabbitmq:3
+  redis:
+    command: [redis-server, --appendonly, 'yes']
+    hostname: redis
+    image: redis:4
+  bridge_request:
+    image: poanetwork/tokenbridge-oracle:latest
+    env_file: local-envs/oracle.env
+    entrypoint: yarn watcher:signature-request
+  bridge_collected:
+    image: poanetwork/tokenbridge-oracle:latest
+    env_file: local-envs/oracle.env
+    entrypoint: yarn watcher:collected-signatures
+  bridge_affirmation:
+    image: poanetwork/tokenbridge-oracle:latest
+    env_file: local-envs/oracle.env
+    entrypoint: yarn watcher:affirmation-request
+  bridge_senderhome:
+    image: poanetwork/tokenbridge-oracle:latest
+    env_file: local-envs/oracle.env
+    entrypoint: yarn sender:home
+  bridge_senderforeign:
+    image: poanetwork/tokenbridge-oracle:latest
+    env_file: local-envs/oracle.env
+    entrypoint: yarn sender:foreign

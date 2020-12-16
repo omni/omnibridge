@@ -28,6 +28,7 @@
     "global-require": "off",
     "no-loop-func": "off",
     "no-console": "off",
-    "node/no-missing-require": "off"
+    "node/no-missing-require": "off",
+    "import/no-unresolved": "off"
   }
 }

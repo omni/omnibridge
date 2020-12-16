@@ -8,3 +8,4 @@ deploy/*.env*
 !deploy/.env.example
 deploy/bridgeDeploymentResults.json
 coverage.json
+e2e-tests/.env
