@@ -6,11 +6,12 @@ COPY package.json yarn.lock ./
 RUN yarn
 
 COPY truffle-config.js truffle-config.js
+COPY ./precompiled ./precompiled
 COPY ./contracts ./contracts
 RUN yarn compile
 
 COPY flatten.sh flatten.sh
-RUN bash flatten.sh
+RUN yarn flatten
 
 COPY deploy.sh deploy.sh
 COPY ./deploy ./deploy
