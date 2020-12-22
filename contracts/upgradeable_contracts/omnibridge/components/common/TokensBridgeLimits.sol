@@ -1,14 +1,13 @@
 pragma solidity 0.7.5;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "../../../upgradeability/EternalStorage.sol";
-import "../../Ownable.sol";
+import "../../../Ownable.sol";
 
 /**
  * @title TokensBridgeLimits
  * @dev Functionality for keeping track of bridgin limits for multiple tokens.
  */
-contract TokensBridgeLimits is EternalStorage, Ownable {
+contract TokensBridgeLimits is Ownable {
     using SafeMath for uint256;
 
     // token == 0x00..00 represents default limits (assuming decimals == 18) for all newly created tokens

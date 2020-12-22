@@ -1,10 +1,10 @@
 pragma solidity 0.7.5;
 
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "../../../interfaces/IERC677.sol";
-import "../../../libraries/Bytes.sol";
-import "../../ReentrancyGuard.sol";
-import "../../BasicAMBMediator.sol";
+import "../../../../interfaces/IERC677.sol";
+import "../../../../libraries/Bytes.sol";
+import "../../../ReentrancyGuard.sol";
+import "../../../BasicAMBMediator.sol";
 
 /**
  * @title TokensRelayer

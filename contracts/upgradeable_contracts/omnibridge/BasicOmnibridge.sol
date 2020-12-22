@@ -1,9 +1,9 @@
 pragma solidity 0.7.5;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "./Initializable.sol";
-import "./Upgradeable.sol";
-import "./Claimable.sol";
+import "../Initializable.sol";
+import "../Upgradeable.sol";
+import "../Claimable.sol";
 import "./components/bridged/BridgedTokensRegistry.sol";
 import "./components/native/NativeTokensRegistry.sol";
 import "./components/native/MediatorBalanceStorage.sol";
@@ -12,8 +12,8 @@ import "./components/common/OmnibridgeInfo.sol";
 import "./components/common/TokensBridgeLimits.sol";
 import "./components/common/FailedMessagesProcessor.sol";
 import "./modules/factory/TokenFactoryConnector.sol";
-import "../interfaces/IBurnableMintableERC677Token.sol";
-import "../libraries/TokenReader.sol";
+import "../../interfaces/IBurnableMintableERC677Token.sol";
+import "../../libraries/TokenReader.sol";
 
 /**
  * @title BasicOmnibridge

@@ -1,19 +1,19 @@
 pragma solidity 0.7.5;
 
-import "../../VersionableBridge.sol";
+import "../../../VersionableBridge.sol";
 
 /**
- * @title OmnibridgeInfo
- * @dev Functionality for versioning Omnibridge mediator.
+ * @title NFTOmnibridgeInfo
+ * @dev Functionality for versioning NFTOmnibridge mediator.
  */
-contract OmnibridgeInfo is VersionableBridge {
+contract NFTOmnibridgeInfo is VersionableBridge {
     event TokensBridgingInitiated(
         address indexed token,
         address indexed sender,
-        uint256 value,
+        uint256 tokenId,
         bytes32 indexed messageId
     );
-    event TokensBridged(address indexed token, address indexed recipient, uint256 value, bytes32 indexed messageId);
+    event TokensBridged(address indexed token, address indexed recipient, uint256 tokenId, bytes32 indexed messageId);
 
     /**
      * @dev Tells the bridge interface version that this contract supports.
@@ -31,7 +31,7 @@ contract OmnibridgeInfo is VersionableBridge {
             uint64 patch
         )
     {
-        return (2, 0, 0);
+        return (1, 0, 0);
     }
 
     /**
@@ -39,6 +39,6 @@ contract OmnibridgeInfo is VersionableBridge {
      * @return _data 4 bytes representing the bridge mode
      */
     function getBridgeMode() external pure override returns (bytes4 _data) {
-        return 0xb1516c26; // bytes4(keccak256(abi.encodePacked("multi-erc-to-erc-amb")))
+        return 0xca7fc3dc; // bytes4(keccak256(abi.encodePacked("multi-nft-to-nft-amb")))
     }
 }

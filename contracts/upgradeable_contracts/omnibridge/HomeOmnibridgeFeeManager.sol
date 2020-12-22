@@ -1,10 +1,10 @@
 pragma solidity 0.7.5;
 
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "./BaseRewardAddressList.sol";
-import "./Ownable.sol";
-import "../interfaces/IERC677.sol";
-import "../interfaces/IBurnableMintableERC677Token.sol";
+import "../BaseRewardAddressList.sol";
+import "../Ownable.sol";
+import "../../interfaces/IERC677.sol";
+import "../../interfaces/IBurnableMintableERC677Token.sol";
 import "./components/common/TokensBridgeLimits.sol";
 
 /**
