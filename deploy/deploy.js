@@ -46,15 +46,53 @@ async function deployOmnibridge() {
   })
 }
 
+async function deployOmnibridgeNFT() {
+  const preDeploy = require('./src/omnibridge_nft/preDeploy')
+  const deployHome = require('./src/omnibridge_nft/home')
+  const deployForeign = require('./src/omnibridge_nft/foreign')
+  const initializeHome = require('./src/omnibridge_nft/initializeHome')
+  const initializeForeign = require('./src/omnibridge_nft/initializeForeign')
+  await preDeploy()
+  const { homeBridgeMediator, tokenImage: homeTokenImage } = await deployHome()
+  const { foreignBridgeMediator, tokenImage: foreignTokenImage } = await deployForeign()
+
+  await initializeHome({
+    homeBridge: homeBridgeMediator.address,
+    foreignBridge: foreignBridgeMediator.address,
+    tokenImage: homeTokenImage.address,
+  })
+
+  await initializeForeign({
+    foreignBridge: foreignBridgeMediator.address,
+    homeBridge: homeBridgeMediator.address,
+    tokenImage: foreignTokenImage.address,
+  })
+
+  console.log('\nDeployment has been completed.\n\n')
+  console.log(`[   Home  ] Bridge Mediator: ${homeBridgeMediator.address}`)
+  console.log(`[ Foreign ] Bridge Mediator: ${foreignBridgeMediator.address}`)
+  writeDeploymentResults({
+    homeBridge: {
+      homeBridgeMediator,
+    },
+    foreignBridge: {
+      foreignBridgeMediator,
+    },
+  })
+}
+
 async function main() {
   console.log(`Bridge mode: ${BRIDGE_MODE}`)
   switch (BRIDGE_MODE) {
     case 'OMNIBRIDGE':
       await deployOmnibridge()
       break
+    case 'OMNIBRIDGE_NFT':
+      await deployOmnibridgeNFT()
+      break
     default:
       console.log(BRIDGE_MODE)
-      throw new Error('Please specify BRIDGE_MODE: OMNIBRIDGE')
+      throw new Error('Please specify BRIDGE_MODE: OMNIBRIDGE or OMNIBRIDGE_NFT')
   }
 }
 

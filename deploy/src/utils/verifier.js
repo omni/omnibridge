@@ -69,8 +69,10 @@ const verifyContract = async (contract, params, type) => {
       console.log(`${params.address} verified in ${type}`)
       return true
     }
+    console.log(result.data)
     return false
   } catch (e) {
+    console.log(e.message)
     return false
   }
 }

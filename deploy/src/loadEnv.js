@@ -34,15 +34,7 @@ function checkLimits(min, max, daily, prefix) {
   }
 }
 
-const { BRIDGE_MODE, HOME_REWARDABLE, FOREIGN_REWARDABLE } = process.env
-
-if (!validRewardModes.includes(HOME_REWARDABLE)) {
-  throw new Error(`Invalid HOME_REWARDABLE: ${HOME_REWARDABLE}. Supported values are ${validRewardModes}`)
-}
-
-if (!validRewardModes.includes(FOREIGN_REWARDABLE)) {
-  throw new Error(`Invalid FOREIGN_REWARDABLE: ${FOREIGN_REWARDABLE}. Supported values are ${validRewardModes}`)
-}
+const { BRIDGE_MODE } = process.env
 
 // Types validations
 
@@ -79,7 +71,7 @@ switch (BRIDGE_MODE) {
       FOREIGN_TOKEN_FACTORY: optionalAddressValidator(),
     }
 
-    if (HOME_REWARDABLE === 'BOTH_DIRECTIONS') {
+    if (process.env.HOME_REWARDABLE === 'BOTH_DIRECTIONS') {
       validations = {
         ...validations,
         HOME_MEDIATOR_REWARD_ACCOUNTS: addressesValidator(),
@@ -88,13 +80,37 @@ switch (BRIDGE_MODE) {
       }
     }
     break
+  case 'OMNIBRIDGE_NFT':
+    validations = {
+      ...validations,
+      HOME_AMB_BRIDGE: addressValidator(),
+      FOREIGN_AMB_BRIDGE: addressValidator(),
+      HOME_MEDIATOR_REQUEST_GAS_LIMIT: bigNumValidator(),
+      FOREIGN_MEDIATOR_REQUEST_GAS_LIMIT: bigNumValidator(),
+      FOREIGN_DAILY_LIMIT: bigNumValidator(),
+      HOME_DAILY_LIMIT: bigNumValidator(),
+      HOME_ERC721_TOKEN_IMAGE: optionalAddressValidator(),
+      FOREIGN_ERC721_TOKEN_IMAGE: optionalAddressValidator(),
+    }
+    break
   default:
-    throw new Error(`Invalid BRIDGE_MODE=${BRIDGE_MODE}. Only OMNIBRIDGE is supported.`)
+    throw new Error(`Invalid BRIDGE_MODE=${BRIDGE_MODE}. Only OMNIBRIDGE and OMNIBRIDGE_NFT are supported.`)
 }
 
 const env = envalid.cleanEnv(process.env, validations)
 
-checkLimits(env.HOME_MIN_AMOUNT_PER_TX, env.HOME_MAX_AMOUNT_PER_TX, env.HOME_DAILY_LIMIT, homePrefix)
-checkLimits(env.FOREIGN_MIN_AMOUNT_PER_TX, env.FOREIGN_MAX_AMOUNT_PER_TX, env.FOREIGN_DAILY_LIMIT, foreignPrefix)
+if (BRIDGE_MODE === 'OMNIBRIDGE') {
+  const { HOME_REWARDABLE, FOREIGN_REWARDABLE } = process.env
+  if (!validRewardModes.includes(HOME_REWARDABLE)) {
+    throw new Error(`Invalid HOME_REWARDABLE: ${HOME_REWARDABLE}. Supported values are ${validRewardModes}`)
+  }
+
+  if (!validRewardModes.includes(FOREIGN_REWARDABLE)) {
+    throw new Error(`Invalid FOREIGN_REWARDABLE: ${FOREIGN_REWARDABLE}. Supported values are ${validRewardModes}`)
+  }
+
+  checkLimits(env.HOME_MIN_AMOUNT_PER_TX, env.HOME_MAX_AMOUNT_PER_TX, env.HOME_DAILY_LIMIT, homePrefix)
+  checkLimits(env.FOREIGN_MIN_AMOUNT_PER_TX, env.FOREIGN_MAX_AMOUNT_PER_TX, env.FOREIGN_DAILY_LIMIT, foreignPrefix)
+}
 
 module.exports = env
