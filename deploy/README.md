@@ -11,7 +11,7 @@ yarn compile
 2. Create a `.env` file.
 ```
 cd deploy
-cp .env.example .env
+cp env-examples/.env.omnibridge .env
 ```
 
 3. If necessary, deploy and configure a multi-sig wallet contract to manage the bridge contracts after deployment. We have not audited any wallets for security, but have used https://github.com/gnosis/MultiSigWallet/ with success.

@@ -4,7 +4,6 @@
 .dockerignore
 deploy/*.config
 deploy/*.env*
-!deploy/.env.example
 docker-compose.yml
 Dockerfile*
 *.log
