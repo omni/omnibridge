@@ -4,8 +4,6 @@ if [ -d flats ]; then
   rm -rf flats
 fi
 
-mkdir -p flats/upgradeability
-
 FLATTENER=./node_modules/.bin/truffle-flattener
 BRIDGE_CONTRACTS_DIR=contracts/upgradeable_contracts
 TOKEN_CONTRACTS_DIR=contracts/tokens
@@ -21,9 +19,9 @@ ${FLATTENER} ${BRIDGE_CONTRACTS_DIR}/omnibridge/modules/factory/TokenProxy.sol >
 ${FLATTENER} ${BRIDGE_CONTRACTS_DIR}/omnibridge/modules/forwarding_rules/MultiTokenForwardingRulesManager.sol > flats/MultiTokenForwardingRulesManager_flat.sol
 
 echo "Flattening contracts related to NFT Omnibridge"
-${FLATTENER} ${BRIDGE_CONTRACTS_DIR}/omnibridge_nft/HomeOmnibridgeNFT.sol > flats/HomeOmnibridgeNFT_flat.sol
-${FLATTENER} ${BRIDGE_CONTRACTS_DIR}/omnibridge_nft/ForeignOmnibridgeNFT.sol > flats/ForeignOmnibridgeNFT_flat.sol
-${FLATTENER} ${BRIDGE_CONTRACTS_DIR}/omnibridge_nft/components/bridged/NFTProxy.sol > flats/NFTProxy_flat.sol
+${FLATTENER} ${BRIDGE_CONTRACTS_DIR}/omnibridge_nft/HomeNFTOmnibridge.sol > flats/HomeNFTOmnibridge_flat.sol
+${FLATTENER} ${BRIDGE_CONTRACTS_DIR}/omnibridge_nft/ForeignNFTOmnibridge.sol > flats/ForeignNFTOmnibridge_flat.sol
+${FLATTENER} ${BRIDGE_CONTRACTS_DIR}/omnibridge_nft/components/bridged/ERC721TokenProxy.sol > flats/ERC721TokenProxy_flat.sol
 
 echo "Flattening token contracts"
 ${FLATTENER} ${TOKEN_CONTRACTS_DIR}/ERC721BridgeToken.sol > flats/ERC721BridgeToken_flat.sol
