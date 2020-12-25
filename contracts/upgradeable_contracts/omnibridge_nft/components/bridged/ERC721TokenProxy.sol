@@ -2,6 +2,7 @@ pragma solidity 0.7.5;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 import "../../../../upgradeability/Proxy.sol";
+import "../../../../interfaces/IOwnable.sol";
 
 /**
  * @title ERC721TokenProxy
@@ -59,11 +60,11 @@ contract ERC721TokenProxy is Proxy {
 
     /**
      * @dev Updates the implementation contract address.
-     * Can only be called by the owner.
+     * Only the bridge and bridge owner can call this method.
      * @param _implementation address of the new implementation.
      */
     function setImplementation(address _implementation) external {
-        require(msg.sender == bridgeContract);
+        require(msg.sender == bridgeContract || msg.sender == IOwnable(bridgeContract).owner());
         require(_implementation != address(0));
         require(Address.isContract(_implementation));
         assembly {
