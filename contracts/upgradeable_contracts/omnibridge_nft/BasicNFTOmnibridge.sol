@@ -144,6 +144,21 @@ abstract contract BasicNFTOmnibridge is
     }
 
     /**
+     * @dev Allows to pre-set the bridged token contract for not-yet bridged token.
+     * Only the owner can call this method.
+     * @param _nativeToken address of the token contract on the other side that was not yet bridged.
+     * @param _bridgedToken address of the bridged token contract.
+     */
+    function setCustomTokenAddressPair(address _nativeToken, address _bridgedToken) external onlyOwner {
+        require(Address.isContract(_bridgedToken));
+        require(!isTokenRegistered(_bridgedToken));
+        require(bridgedTokenAddress(_nativeToken) == address(0));
+
+        _setTokenAddressPair(_nativeToken, _bridgedToken);
+        _initToken(_bridgedToken);
+    }
+
+    /**
      * @dev Allows to send to the other network some ERC721 token that can be forced into the contract
      * without the invocation of the required methods. (e. g. regular transferFrom without a call to onERC721Received)
      * @param _token address of the token contract.

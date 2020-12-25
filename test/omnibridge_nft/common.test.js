@@ -217,6 +217,38 @@ function runTests(accounts, isHome) {
           expect(await contract.executionDailyLimit(bridgedToken)).to.be.bignumber.equal('5')
         })
       })
+
+      describe('preset token address pair', () => {
+        it('should allow to set address pair for not yet bridged token', async () => {
+          await contract.setCustomTokenAddressPair(otherSideToken1, token.address, { from: user }).should.be.rejected
+          await contract.setCustomTokenAddressPair(otherSideToken1, user).should.be.rejected
+          await contract.setCustomTokenAddressPair(otherSideToken1, token.address).should.be.fulfilled
+          await contract.setCustomTokenAddressPair(otherSideToken1, token.address).should.be.rejected
+
+          const events = await getEvents(contract, { event: 'NewTokenRegistered' })
+          expect(events.length).to.be.equal(1)
+          const { nativeToken, bridgedToken } = events[0].returnValues
+          expect(nativeToken).to.be.equal(otherSideToken1)
+          expect(bridgedToken).to.be.equal(token.address)
+
+          expect(await contract.nativeTokenAddress(bridgedToken)).to.be.equal(nativeToken)
+          expect(await contract.bridgedTokenAddress(nativeToken)).to.be.equal(bridgedToken)
+        })
+
+        it('should not allow to set address pair if native token is already bridged', async () => {
+          const args = [otherSideToken1, 'Test', 'TST', user, 1]
+          const data = contract.contract.methods.deployAndHandleBridgedNFT(...args).encodeABI()
+          expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
+
+          await contract.setCustomTokenAddressPair(otherSideToken1, token.address).should.be.rejected
+        })
+
+        it('should not allow to set address pair if bridged token is already registered', async () => {
+          await sendFunctions[0]()
+
+          await contract.setCustomTokenAddressPair(otherSideToken1, token.address).should.be.rejected
+        })
+      })
     })
 
     describe('native tokens', () => {
@@ -711,7 +743,7 @@ function runTests(accounts, isHome) {
           expect(event[0].returnValues.messageId).to.be.equal(exampleMessageId)
         })
 
-        it('should do not deploy new contract if token is already deployed', async () => {
+        it('should not deploy new contract if token is already deployed', async () => {
           const args = [otherSideToken1, 'Test', 'TST', user]
           const data1 = contract.contract.methods.deployAndHandleBridgedNFT(...args, 1).encodeABI()
           const data2 = contract.contract.methods.deployAndHandleBridgedNFT(...args, 2).encodeABI()
@@ -726,7 +758,7 @@ function runTests(accounts, isHome) {
           expect(event.length).to.be.equal(2)
         })
 
-        it('should modify used symbol instead of name if empty', async () => {
+        it('should use modified symbol instead of name if empty', async () => {
           const args = [otherSideToken1, '', 'TST', user, 1]
           const data = contract.contract.methods.deployAndHandleBridgedNFT(...args).encodeABI()
 
@@ -737,7 +769,7 @@ function runTests(accounts, isHome) {
           expect(await deployedToken.symbol()).to.be.equal('TST')
         })
 
-        it('should modify used name instead of symbol if empty', async () => {
+        it('should use modified name instead of symbol if empty', async () => {
           const args = [otherSideToken1, 'Test', '', user, 1]
           const data = contract.contract.methods.deployAndHandleBridgedNFT(...args).encodeABI()
 
