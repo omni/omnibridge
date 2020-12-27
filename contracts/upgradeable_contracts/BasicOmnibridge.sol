@@ -5,6 +5,7 @@ import "./Initializable.sol";
 import "./Upgradeable.sol";
 import "./Claimable.sol";
 import "./components/bridged/BridgedTokensRegistry.sol";
+import "./components/bridged/DecimalShiftHandler.sol";
 import "./components/native/NativeTokensRegistry.sol";
 import "./components/native/MediatorBalanceStorage.sol";
 import "./components/common/TokensRelayer.sol";
@@ -13,6 +14,7 @@ import "./components/common/TokensBridgeLimits.sol";
 import "./components/common/FailedMessagesProcessor.sol";
 import "./modules/factory/TokenFactoryConnector.sol";
 import "../interfaces/IBurnableMintableERC677Token.sol";
+import "../interfaces/IERC20Metadata.sol";
 import "../libraries/TokenReader.sol";
 
 /**
@@ -30,7 +32,8 @@ abstract contract BasicOmnibridge is
     NativeTokensRegistry,
     MediatorBalanceStorage,
     TokenFactoryConnector,
-    TokensBridgeLimits
+    TokensBridgeLimits,
+    DecimalShiftHandler
 {
     using SafeERC20 for IERC677;
     using SafeMath for uint256;
@@ -67,9 +70,13 @@ abstract contract BasicOmnibridge is
             bridgedToken = tokenFactory().deploy(name, symbol, _decimals, bridgeContract().sourceChainId());
             _setTokenAddressPair(_token, bridgedToken);
             _initToken(bridgedToken, _decimals);
+        } else if (!isTokenRegistered(bridgedToken)) {
+            uint8 decimals = IERC20Metadata(bridgedToken).decimals();
+            _initToken(bridgedToken, decimals);
+            _setDecimalShift(bridgedToken, int256(decimals) - int256(_decimals));
         }
 
-        _handleTokens(bridgedToken, false, _recipient, _value);
+        _handleTokens(bridgedToken, false, _recipient, _shiftValue(bridgedToken, _value));
     }
 
     /**
@@ -88,7 +95,7 @@ abstract contract BasicOmnibridge is
 
         require(isTokenRegistered(token));
 
-        _handleTokens(token, false, _recipient, _value);
+        _handleTokens(token, false, _recipient, _shiftValue(token, _value));
     }
 
     /**
@@ -135,6 +142,23 @@ abstract contract BasicOmnibridge is
         } else {
             _getMinterFor(_token).mint(_recipient, _value);
         }
+    }
+
+    /**
+     * @dev Allows to pre-set the bridged token contract for not-yet bridged token.
+     * Only the owner can call this method.
+     * @param _nativeToken address of the token contract on the other side that was not yet bridged.
+     * @param _bridgedToken address of the bridged token contract.
+     */
+    function setCustomTokenAddressPair(address _nativeToken, address _bridgedToken) external onlyOwner {
+        require(!isTokenRegistered(_bridgedToken));
+        require(nativeTokenAddress(_bridgedToken) == address(0));
+        require(bridgedTokenAddress(_nativeToken) == address(0));
+
+        IBurnableMintableERC677Token(_bridgedToken).mint(address(this), 1);
+        IBurnableMintableERC677Token(_bridgedToken).burn(1);
+
+        _setTokenAddressPair(_nativeToken, _bridgedToken);
     }
 
     /**
@@ -234,7 +258,12 @@ abstract contract BasicOmnibridge is
         if (_isKnownToken) {
             IBurnableMintableERC677Token(_token).burn(_value);
             return
-                abi.encodeWithSelector(this.handleNativeTokens.selector, nativeTokenAddress(_token), _receiver, _value);
+                abi.encodeWithSelector(
+                    this.handleNativeTokens.selector,
+                    nativeTokenAddress(_token),
+                    _receiver,
+                    _unshiftValue(_token, _value)
+                );
         }
 
         // process token that was not previously seen
