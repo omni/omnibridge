@@ -1121,6 +1121,59 @@ function runTests(accounts, isHome) {
           expect(events[1].returnValues.data.slice(2, 10)).to.be.equal('0950d515')
         })
       })
+
+      describe('custom token pair', () => {
+        it('should allow to set custom bridged token', async () => {
+          const args = [otherSideToken1, 'Test', 'TST', 18, user, value]
+          const data = contract.contract.methods.deployAndHandleBridgedTokens(...args).encodeABI()
+          expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
+          const deployedToken = await contract.bridgedTokenAddress(otherSideToken1)
+
+          await contract.setCustomTokenAddressPair(otherSideToken2, token.address).should.be.rejected
+          await contract.setCustomTokenAddressPair(otherSideToken2, ambBridgeContract.address).should.be.rejected
+          await token.transferOwnership(contract.address).should.be.fulfilled
+          await contract.setCustomTokenAddressPair(otherSideToken2, token.address, { from: user }).should.be.rejected
+          await contract.setCustomTokenAddressPair(otherSideToken1, token.address).should.be.rejected
+          await contract.setCustomTokenAddressPair(otherSideToken2, deployedToken).should.be.rejected
+          await contract.setCustomTokenAddressPair(otherSideToken2, token.address).should.be.fulfilled
+          await contract.setCustomTokenAddressPair(otherSideToken2, token.address).should.be.rejected
+
+          expect(await contract.bridgedTokenAddress(otherSideToken2)).to.be.equal(token.address)
+          expect(await contract.nativeTokenAddress(token.address)).to.be.equal(otherSideToken2)
+        })
+
+        for (const decimals of [16, 20]) {
+          it(`should allow to use token with higher decimals = ${decimals}`, async () => {
+            const shiftedValue = `1${'0'.repeat(decimals)}`
+            token = await PermittableToken.new('Test', 'TST', decimals, 1337)
+            await token.transferOwnership(contract.address).should.be.fulfilled
+            await contract.setCustomTokenAddressPair(otherSideToken1, token.address).should.be.fulfilled
+
+            const deployArgs = [otherSideToken1, 'Test', 'TST', 18, user, value]
+            const data = contract.contract.methods.deployAndHandleBridgedTokens(...deployArgs).encodeABI()
+            expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
+
+            const events1 = await getEvents(contract, { event: 'TokensBridged' })
+            expect(events1.length).to.be.equal(1)
+            expect(events1[0].returnValues.value).to.be.equal(shiftedValue)
+            expect(await token.balanceOf(user)).to.be.bignumber.equal(shiftedValue)
+
+            await sendFunctions[0](shiftedValue)
+
+            const events2 = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
+            expect(events2.length).to.be.equal(1)
+            const args = web3.eth.abi.decodeParameters(
+              ['address', 'address', 'uint256'],
+              events2[0].returnValues.data.slice(10)
+            )
+            expect(args[2]).to.be.equal(value.toString())
+
+            const events3 = await getEvents(contract, { event: 'TokensBridgingInitiated' })
+            expect(events3.length).to.be.equal(1)
+            expect(events3[0].returnValues.value).to.be.equal(shiftedValue)
+          })
+        }
+      })
     })
   })
 
