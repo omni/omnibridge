@@ -13,6 +13,7 @@ import "./components/common/TokensBridgeLimits.sol";
 import "./components/common/FailedMessagesProcessor.sol";
 import "./modules/factory/TokenFactoryConnector.sol";
 import "../interfaces/IBurnableMintableERC677Token.sol";
+import "../interfaces/IERC20Metadata.sol";
 import "../libraries/TokenReader.sol";
 
 /**
@@ -66,6 +67,9 @@ abstract contract BasicOmnibridge is
             name = _transformName(name);
             bridgedToken = tokenFactory().deploy(name, symbol, _decimals, bridgeContract().sourceChainId());
             _setTokenAddressPair(_token, bridgedToken);
+            _initToken(bridgedToken, _decimals);
+        } else if (!isTokenRegistered(bridgedToken)) {
+            require(IERC20Metadata(bridgedToken).decimals() == _decimals);
             _initToken(bridgedToken, _decimals);
         }
 
@@ -135,6 +139,23 @@ abstract contract BasicOmnibridge is
         } else {
             _getMinterFor(_token).mint(_recipient, _value);
         }
+    }
+
+    /**
+     * @dev Allows to pre-set the bridged token contract for not-yet bridged token.
+     * Only the owner can call this method.
+     * @param _nativeToken address of the token contract on the other side that was not yet bridged.
+     * @param _bridgedToken address of the bridged token contract.
+     */
+    function setCustomTokenAddressPair(address _nativeToken, address _bridgedToken) external onlyOwner {
+        require(!isTokenRegistered(_bridgedToken));
+        require(nativeTokenAddress(_bridgedToken) == address(0));
+        require(bridgedTokenAddress(_nativeToken) == address(0));
+
+        IBurnableMintableERC677Token(_bridgedToken).mint(address(this), 1);
+        IBurnableMintableERC677Token(_bridgedToken).burn(1);
+
+        _setTokenAddressPair(_nativeToken, _bridgedToken);
     }
 
     /**

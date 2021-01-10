@@ -1121,6 +1121,40 @@ function runTests(accounts, isHome) {
           expect(events[1].returnValues.data.slice(2, 10)).to.be.equal('0950d515')
         })
       })
+
+      describe('custom token pair', () => {
+        it('should allow to set custom bridged token', async () => {
+          const args = [otherSideToken1, 'Test', 'TST', 18, user, value]
+          const data = contract.contract.methods.deployAndHandleBridgedTokens(...args).encodeABI()
+          expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
+          const deployedToken = await contract.bridgedTokenAddress(otherSideToken1)
+
+          await contract.setCustomTokenAddressPair(otherSideToken2, token.address).should.be.rejected
+          await contract.setCustomTokenAddressPair(otherSideToken2, ambBridgeContract.address).should.be.rejected
+          await token.transferOwnership(contract.address).should.be.fulfilled
+          await contract.setCustomTokenAddressPair(otherSideToken2, token.address, { from: user }).should.be.rejected
+          await contract.setCustomTokenAddressPair(otherSideToken1, token.address).should.be.rejected
+          await contract.setCustomTokenAddressPair(otherSideToken2, deployedToken).should.be.rejected
+          await contract.setCustomTokenAddressPair(otherSideToken2, token.address).should.be.fulfilled
+          await contract.setCustomTokenAddressPair(otherSideToken2, token.address).should.be.rejected
+
+          expect(await contract.bridgedTokenAddress(otherSideToken2)).to.be.equal(token.address)
+          expect(await contract.nativeTokenAddress(token.address)).to.be.equal(otherSideToken2)
+        })
+
+        it('should not work for different decimals', async () => {
+          token = await PermittableToken.new('Test', 'TST', 18, 1337)
+          await token.transferOwnership(contract.address).should.be.fulfilled
+          await contract.setCustomTokenAddressPair(otherSideToken1, token.address).should.be.fulfilled
+
+          const deployArgs1 = [otherSideToken1, 'Test', 'TST', 20, user, value]
+          const deployArgs2 = [otherSideToken1, 'Test', 'TST', 18, user, value]
+          const data1 = contract.contract.methods.deployAndHandleBridgedTokens(...deployArgs1).encodeABI()
+          const data2 = contract.contract.methods.deployAndHandleBridgedTokens(...deployArgs2).encodeABI()
+          expect(await executeMessageCall(exampleMessageId, data1)).to.be.equal(false)
+          expect(await executeMessageCall(otherMessageId, data2)).to.be.equal(true)
+        })
+      })
     })
   })
 
