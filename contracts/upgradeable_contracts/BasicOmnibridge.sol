@@ -5,7 +5,6 @@ import "./Initializable.sol";
 import "./Upgradeable.sol";
 import "./Claimable.sol";
 import "./components/bridged/BridgedTokensRegistry.sol";
-import "./components/bridged/DecimalShiftHandler.sol";
 import "./components/native/NativeTokensRegistry.sol";
 import "./components/native/MediatorBalanceStorage.sol";
 import "./components/common/TokensRelayer.sol";
@@ -32,8 +31,7 @@ abstract contract BasicOmnibridge is
     NativeTokensRegistry,
     MediatorBalanceStorage,
     TokenFactoryConnector,
-    TokensBridgeLimits,
-    DecimalShiftHandler
+    TokensBridgeLimits
 {
     using SafeERC20 for IERC677;
     using SafeMath for uint256;
@@ -71,12 +69,11 @@ abstract contract BasicOmnibridge is
             _setTokenAddressPair(_token, bridgedToken);
             _initToken(bridgedToken, _decimals);
         } else if (!isTokenRegistered(bridgedToken)) {
-            uint8 decimals = IERC20Metadata(bridgedToken).decimals();
-            _initToken(bridgedToken, decimals);
-            _setDecimalShift(bridgedToken, int256(decimals) - int256(_decimals));
+            require(IERC20Metadata(bridgedToken).decimals() == _decimals);
+            _initToken(bridgedToken, _decimals);
         }
 
-        _handleTokens(bridgedToken, false, _recipient, _shiftValue(bridgedToken, _value));
+        _handleTokens(bridgedToken, false, _recipient, _value);
     }
 
     /**
@@ -95,7 +92,7 @@ abstract contract BasicOmnibridge is
 
         require(isTokenRegistered(token));
 
-        _handleTokens(token, false, _recipient, _shiftValue(token, _value));
+        _handleTokens(token, false, _recipient, _value);
     }
 
     /**
@@ -258,12 +255,7 @@ abstract contract BasicOmnibridge is
         if (_isKnownToken) {
             IBurnableMintableERC677Token(_token).burn(_value);
             return
-                abi.encodeWithSelector(
-                    this.handleNativeTokens.selector,
-                    nativeTokenAddress(_token),
-                    _receiver,
-                    _unshiftValue(_token, _value)
-                );
+                abi.encodeWithSelector(this.handleNativeTokens.selector, nativeTokenAddress(_token), _receiver, _value);
         }
 
         // process token that was not previously seen
