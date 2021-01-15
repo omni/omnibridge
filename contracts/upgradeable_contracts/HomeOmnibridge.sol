@@ -1,15 +1,15 @@
 pragma solidity 0.7.5;
 
 import "./BasicOmnibridge.sol";
-import "./HomeOmnibridgeFeeManager.sol";
 import "./modules/forwarding_rules/MultiTokenForwardingRulesConnector.sol";
+import "./modules/fee_manager/OmnibridgeFeeManagerConnector.sol";
 
 /**
  * @title HomeOmnibridge
  * @dev Home side implementation for multi-token mediator intended to work on top of AMB bridge.
  * It is designed to be used as an implementation contract of EternalStorageProxy contract.
  */
-contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiTokenForwardingRulesConnector {
+contract HomeOmnibridge is BasicOmnibridge, OmnibridgeFeeManagerConnector, MultiTokenForwardingRulesConnector {
     using SafeMath for uint256;
     using SafeERC20 for IERC677;
 
@@ -24,9 +24,6 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
      * @param _requestGasLimit the gas limit for the message execution.
      * @param _owner address of the owner of the mediator contract.
      * @param _tokenFactory address of the TokenFactory contract that will be used for the deployment of new tokens.
-     * @param _rewardAddresses list of reward addresses, between whom fees will be distributed.
-     * @param _fees array with initial fees for both bridge directions.
-     *   [ 0 = homeToForeignFee, 1 = foreignToHomeFee ]
      */
     function initialize(
         address _bridgeContract,
@@ -35,9 +32,7 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
         uint256[2] calldata _executionDailyLimitExecutionMaxPerTxArray, // [ 0 = _executionDailyLimit, 1 = _executionMaxPerTx ]
         uint256 _requestGasLimit,
         address _owner,
-        address _tokenFactory,
-        address[] calldata _rewardAddresses,
-        uint256[2] calldata _fees // [ 0 = homeToForeignFee, 1 = foreignToHomeFee ]
+        address _tokenFactory
     ) external onlyRelevantSender returns (bool) {
         require(!isInitialized());
 
@@ -48,11 +43,6 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
         _setRequestGasLimit(_requestGasLimit);
         _setOwner(_owner);
         _setTokenFactory(_tokenFactory);
-        if (_rewardAddresses.length > 0) {
-            _setRewardAddressList(_rewardAddresses);
-        }
-        _setFee(HOME_TO_FOREIGN_FEE, address(0), _fees[0]);
-        _setFee(FOREIGN_TO_HOME_FEE, address(0), _fees[1]);
 
         setInitialize();
 
@@ -99,18 +89,6 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
     }
 
     /**
-     * @dev One-time upgrade function for transferring ownership of the STAKE token to the TokenMinter address.
-     * Should be called together with upgradeToAndCall function
-     */
-    function transferTokenOwnership() external {
-        require(msg.sender == address(this));
-
-        Ownable(0xb7D311E2Eb55F2f68a9440da38e7989210b9A05e).transferOwnership(
-            0x1111111111111111111111111111111111111111
-        );
-    }
-
-    /**
      * @dev Handles the bridged tokens.
      * Checks that the value is inside the execution limits and invokes the Mint or Unlock accordingly.
      * @param _token token contract address on this side of the bridge.
@@ -128,7 +106,7 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
         addTotalExecutedPerDay(_token, getCurrentDay(), _value);
 
         uint256 valueToBridge = _value;
-        uint256 fee = _distributeFee(FOREIGN_TO_HOME_FEE, _isNative, _token, valueToBridge);
+        uint256 fee = _distributeFee(FOREIGN_TO_HOME_FEE, _isNative, address(0), _token, valueToBridge);
         bytes32 _messageId = messageId();
         if (fee > 0) {
             emit FeeDistributed(fee, _token, _messageId);
@@ -166,22 +144,14 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
         // native unbridged token
         if (!isKnownToken) {
             decimals = uint8(TokenReader.readDecimals(_token));
-            _initToken(_token, decimals);
+            _initializeTokenBridgeLimits(_token, decimals);
         }
 
         require(withinLimit(_token, _value));
         addTotalSpentPerDay(_token, getCurrentDay(), _value);
 
-        uint256 valueToBridge = _value;
-        uint256 fee = 0;
-        // Next line disables fee collection in case sender is one of the reward addresses.
-        // It is needed to allow a 100% withdrawal of tokens from the home side.
-        // If fees are not disabled for reward receivers, small fraction of tokens will always
-        // be redistributed between the same set of reward addresses, which is not the desired behaviour.
-        if (!isRewardAddress(_from)) {
-            fee = _distributeFee(HOME_TO_FOREIGN_FEE, isNativeToken, _token, valueToBridge);
-            valueToBridge = valueToBridge.sub(fee);
-        }
+        uint256 fee = _distributeFee(HOME_TO_FOREIGN_FEE, isNativeToken, _from, _token, _value);
+        uint256 valueToBridge = _value.sub(fee);
 
         bytes memory data = _prepareMessage(isKnownToken, isNativeToken, _token, _receiver, valueToBridge, decimals);
 
@@ -219,17 +189,6 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
     }
 
     /**
-     * @dev Internal function for initializing newly bridged token related information.
-     * @param _token address of the token contract.
-     * @param _decimals token decimals parameter.
-     */
-    function _initToken(address _token, uint8 _decimals) internal override {
-        super._initToken(_token, _decimals);
-        _setFee(HOME_TO_FOREIGN_FEE, _token, getFee(HOME_TO_FOREIGN_FEE, address(0)));
-        _setFee(FOREIGN_TO_HOME_FEE, _token, getFee(FOREIGN_TO_HOME_FEE, address(0)));
-    }
-
-    /**
      * @dev Internal function for transforming the bridged token name. Appends a side-specific suffix.
      * @param _name bridged token from the other side.
      * @return token name for this side of the bridge.
@@ -248,7 +207,7 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
     function _getMinterFor(address _token)
         internal
         view
-        override(BasicOmnibridge, HomeOmnibridgeFeeManager)
+        override(BasicOmnibridge, OmnibridgeFeeManagerConnector)
         returns (IBurnableMintableERC677Token)
     {
         if (_token == address(0xb7D311E2Eb55F2f68a9440da38e7989210b9A05e)) {

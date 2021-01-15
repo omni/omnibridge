@@ -67,10 +67,10 @@ abstract contract BasicOmnibridge is
             name = _transformName(name);
             bridgedToken = tokenFactory().deploy(name, symbol, _decimals, bridgeContract().sourceChainId());
             _setTokenAddressPair(_token, bridgedToken);
-            _initToken(bridgedToken, _decimals);
+            _initializeTokenBridgeLimits(bridgedToken, _decimals);
         } else if (!isTokenRegistered(bridgedToken)) {
             require(IERC20Metadata(bridgedToken).decimals() == _decimals);
-            _initToken(bridgedToken, _decimals);
+            _initializeTokenBridgeLimits(bridgedToken, _decimals);
         }
 
         _handleTokens(bridgedToken, false, _recipient, _value);
@@ -275,15 +275,6 @@ abstract contract BasicOmnibridge is
                 _receiver,
                 _value
             );
-    }
-
-    /**
-     * @dev Internal function for initializing newly bridged token related information.
-     * @param _token address of the token contract.
-     * @param _decimals token decimals parameter.
-     */
-    function _initToken(address _token, uint8 _decimals) internal virtual {
-        _initializeTokenBridgeLimits(_token, _decimals);
     }
 
     /**

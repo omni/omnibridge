@@ -104,7 +104,7 @@ contract ForeignOmnibridge is BasicOmnibridge {
         // native unbridged token
         if (!isKnownToken) {
             decimals = uint8(TokenReader.readDecimals(_token));
-            _initToken(_token, decimals);
+            _initializeTokenBridgeLimits(_token, decimals);
         }
 
         require(withinLimit(_token, _value));
