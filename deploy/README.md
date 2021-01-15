@@ -28,7 +28,7 @@ This example of an `.env` file for the `MULTI-AMB-ERC-TO-ERC` bridge mode includ
 
 ```bash
 # The type of bridge. Defines set of contracts to be deployed.
-BRIDGE_MODE=MULTI_AMB_ERC_TO_ERC
+BRIDGE_MODE=OMNIBRIDGE
 
 # The private key hex value of the account responsible for contracts
 # deployments and initial configuration. The account's balance must contain

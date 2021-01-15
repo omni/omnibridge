@@ -1,5 +1,5 @@
-const HomeMultiAMBErc20ToErc677 = artifacts.require('HomeMultiAMBErc20ToErc677')
-const ForeignMultiAMBErc20ToErc677 = artifacts.require('ForeignMultiAMBErc20ToErc677')
+const HomeOmnibridge = artifacts.require('HomeOmnibridge')
+const ForeignOmnibridge = artifacts.require('ForeignOmnibridge')
 const EternalStorageProxy = artifacts.require('EternalStorageProxy')
 const AMBMock = artifacts.require('AMBMock')
 const Sacrifice = artifacts.require('Sacrifice')
@@ -24,7 +24,7 @@ const otherMessageId = '0x35d3818e50234655f6aebb2a1cfbf30f59568d8a4ec72066fac5a2
 const failedMessageId = '0x2ebc2ccc755acc8eaf9252e19573af708d644ab63a39619adb080a3500a4ff2e'
 
 function runTests(accounts, isHome) {
-  const Mediator = isHome ? HomeMultiAMBErc20ToErc677 : ForeignMultiAMBErc20ToErc677
+  const Mediator = isHome ? HomeOmnibridge : ForeignOmnibridge
   const modifyName = (name) => name + (isHome ? ' on xDai' : ' on Mainnet')
   const otherSideMediator = '0x1e33FBB006F47F78704c954555a5c52C2A7f409D'
   const otherSideToken1 = '0xAfb77d544aFc1e2aD3dEEAa20F3c80859E7Fc3C9'
@@ -1121,6 +1121,40 @@ function runTests(accounts, isHome) {
           expect(events[1].returnValues.data.slice(2, 10)).to.be.equal('0950d515')
         })
       })
+
+      describe('custom token pair', () => {
+        it('should allow to set custom bridged token', async () => {
+          const args = [otherSideToken1, 'Test', 'TST', 18, user, value]
+          const data = contract.contract.methods.deployAndHandleBridgedTokens(...args).encodeABI()
+          expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
+          const deployedToken = await contract.bridgedTokenAddress(otherSideToken1)
+
+          await contract.setCustomTokenAddressPair(otherSideToken2, token.address).should.be.rejected
+          await contract.setCustomTokenAddressPair(otherSideToken2, ambBridgeContract.address).should.be.rejected
+          await token.transferOwnership(contract.address).should.be.fulfilled
+          await contract.setCustomTokenAddressPair(otherSideToken2, token.address, { from: user }).should.be.rejected
+          await contract.setCustomTokenAddressPair(otherSideToken1, token.address).should.be.rejected
+          await contract.setCustomTokenAddressPair(otherSideToken2, deployedToken).should.be.rejected
+          await contract.setCustomTokenAddressPair(otherSideToken2, token.address).should.be.fulfilled
+          await contract.setCustomTokenAddressPair(otherSideToken2, token.address).should.be.rejected
+
+          expect(await contract.bridgedTokenAddress(otherSideToken2)).to.be.equal(token.address)
+          expect(await contract.nativeTokenAddress(token.address)).to.be.equal(otherSideToken2)
+        })
+
+        it('should not work for different decimals', async () => {
+          token = await PermittableToken.new('Test', 'TST', 18, 1337)
+          await token.transferOwnership(contract.address).should.be.fulfilled
+          await contract.setCustomTokenAddressPair(otherSideToken1, token.address).should.be.fulfilled
+
+          const deployArgs1 = [otherSideToken1, 'Test', 'TST', 20, user, value]
+          const deployArgs2 = [otherSideToken1, 'Test', 'TST', 18, user, value]
+          const data1 = contract.contract.methods.deployAndHandleBridgedTokens(...deployArgs1).encodeABI()
+          const data2 = contract.contract.methods.deployAndHandleBridgedTokens(...deployArgs2).encodeABI()
+          expect(await executeMessageCall(exampleMessageId, data1)).to.be.equal(false)
+          expect(await executeMessageCall(otherMessageId, data2)).to.be.equal(true)
+        })
+      })
     })
   })
 
@@ -1704,10 +1738,10 @@ function runTests(accounts, isHome) {
   }
 }
 
-contract('ForeignMultiAMBErc20ToErc677', (accounts) => {
+contract('ForeignOmnibridge', (accounts) => {
   runTests(accounts, false)
 })
 
-contract('HomeMultiAMBErc20ToErc677', (accounts) => {
+contract('HomeOmnibridge', (accounts) => {
   runTests(accounts, true)
 })

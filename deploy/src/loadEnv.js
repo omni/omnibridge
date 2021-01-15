@@ -60,7 +60,7 @@ let validations = {
 }
 
 switch (BRIDGE_MODE) {
-  case 'MULTI_AMB_ERC_TO_ERC':
+  case 'OMNIBRIDGE':
     validations = {
       ...validations,
       HOME_AMB_BRIDGE: addressValidator(),
@@ -89,7 +89,7 @@ switch (BRIDGE_MODE) {
     }
     break
   default:
-    throw new Error(`Invalid BRIDGE_MODE=${BRIDGE_MODE}. Only MULTI_AMB_ERC_TO_ERC is supported.`)
+    throw new Error(`Invalid BRIDGE_MODE=${BRIDGE_MODE}. Only OMNIBRIDGE is supported.`)
 }
 
 const env = envalid.cleanEnv(process.env, validations)

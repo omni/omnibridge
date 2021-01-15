@@ -7,24 +7,13 @@ const { EXPLORER_TYPES, REQUEST_STATUS } = require('../constants')
 
 const basePath = path.join(__dirname, '..', '..', '..', 'flats')
 
-const isMultiTokenModule = (name) => name === 'TokenFactory.sol' || name === 'MultiTokenForwardingRulesManager.sol'
-
 const flat = async (contractPath) => {
-  if (contractPath === 'PermittableToken.sol') {
-    const filePath = path.join(basePath, '..', 'precompiled', 'PermittableToken_flat.sol')
-    return fs.readFileSync(filePath).toString()
-  }
   const pathArray = contractPath.split('/')
   const name = pathArray[pathArray.length - 1]
-  let module = pathArray[pathArray.length - 2]
-
-  if (isMultiTokenModule(name)) {
-    module = 'multi_amb_erc20_to_erc677'
-  }
 
   const flatName = name.replace('.sol', '_flat.sol')
 
-  const filePath = path.join(basePath, module, flatName)
+  const filePath = path.join(basePath, flatName)
 
   return fs.readFileSync(filePath).toString()
 }
