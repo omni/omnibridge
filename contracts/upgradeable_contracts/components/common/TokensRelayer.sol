@@ -5,12 +5,13 @@ import "../../../interfaces/IERC677.sol";
 import "../../../libraries/Bytes.sol";
 import "../../ReentrancyGuard.sol";
 import "../../BasicAMBMediator.sol";
+import "../native/NativeTokensRegistry.sol";
 
 /**
  * @title TokensRelayer
  * @dev Functionality for bridging multiple tokens to the other side of the bridge.
  */
-abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard {
+abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard, NativeTokensRegistry {
     using SafeERC20 for IERC677;
 
     /**
@@ -25,7 +26,7 @@ abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard {
         bytes calldata _data
     ) public returns (bool) {
         if (!lock()) {
-            bridgeSpecificActionsOnTokenTransfer(msg.sender, _from, chooseReceiver(_from, _data), _value);
+            bridgeSpecificActionsOnTokenTransfer(msg.sender, _from, chooseReceiver(_from, _data), _value, new bytes(0));
         }
         return true;
     }
@@ -42,7 +43,7 @@ abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard {
         address _receiver,
         uint256 _value
     ) external {
-        _relayTokens(token, _receiver, _value);
+        _relayTokens(token, _receiver, _value, new bytes(0));
     }
 
     /**
@@ -52,7 +53,26 @@ abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard {
      * @param _value amount of tokens to be transferred to the other network.
      */
     function relayTokens(IERC677 token, uint256 _value) external {
-        _relayTokens(token, msg.sender, _value);
+        _relayTokens(token, msg.sender, _value, new bytes(0));
+    }
+
+    /**
+     * @dev Initiate the bridge operation for some amount of tokens from msg.sender.
+     * The user should first call Approve method of the ERC677 token.
+     * @param token bridged token contract address.
+     * @param _receiver address that will receive the native tokens on the other network.
+     * @param _value amount of tokens to be transferred to the other network.
+     * @param _data additional transfer data to be used on the other side.
+     */
+    function relayTokensAndCall(
+        IERC677 token,
+        address _receiver,
+        uint256 _value,
+        bytes memory _data
+    ) external {
+        require(isRegisteredAsNativeToken(address(token)));
+
+        _relayTokens(token, _receiver, _value, _data);
     }
 
     /**
@@ -62,11 +82,13 @@ abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard {
      * @param token bridge token contract address.
      * @param _receiver address that will receive the native tokens on the other network.
      * @param _value amount of tokens to be transferred to the other network.
+     * @param _data additional transfer data to be used on the other side.
      */
     function _relayTokens(
         IERC677 token,
         address _receiver,
-        uint256 _value
+        uint256 _value,
+        bytes memory _data
     ) internal {
         // This lock is to prevent calling passMessage twice if a ERC677 token is used.
         // When transferFrom is called, after the transfer, the ERC677 token will call onTokenTransfer from this contract
@@ -76,7 +98,7 @@ abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard {
         setLock(true);
         token.safeTransferFrom(msg.sender, address(this), _value);
         setLock(false);
-        bridgeSpecificActionsOnTokenTransfer(address(token), msg.sender, _receiver, _value);
+        bridgeSpecificActionsOnTokenTransfer(address(token), msg.sender, _receiver, _value, _data);
     }
 
     /**
@@ -99,6 +121,7 @@ abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard {
         address _token,
         address _from,
         address _receiver,
-        uint256 _value
+        uint256 _value,
+        bytes memory _data
     ) internal virtual;
 }

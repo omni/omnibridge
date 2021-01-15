@@ -6,6 +6,7 @@ const Sacrifice = artifacts.require('Sacrifice')
 const TokenFactory = artifacts.require('TokenFactory')
 const MultiTokenForwardingRulesManager = artifacts.require('MultiTokenForwardingRulesManager')
 const OmnibridgeFeeManager = artifacts.require('OmnibridgeFeeManager')
+const TokenReceiver = artifacts.require('TokenReceiver')
 
 const { expect } = require('chai')
 const { getEvents, ether, expectEventInLogs } = require('../helpers/helpers')
@@ -476,6 +477,43 @@ function runTests(accounts, isHome) {
             expect(depositEvents[1].returnValues.messageId).to.include('0x11223344')
           })
         }
+
+        it('should allow to use relayTokensAndCall', async () => {
+          await sendFunctions[0]().should.be.fulfilled
+
+          let events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
+          expect(events.length).to.be.equal(1)
+
+          expect(await contract.tokenRegistrationMessageId(token.address)).to.be.equal(events[0].returnValues.messageId)
+
+          await token.approve(contract.address, value, { from: user }).should.be.fulfilled
+          await contract.relayTokensAndCall(token.address, otherSideToken1, value, '0x1122', { from: user }).should.be
+            .fulfilled
+
+          events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
+          expect(events.length).to.be.equal(2)
+          const { data, dataType } = events[1].returnValues
+          expect(data.slice(2, 10)).to.be.equal('c5345761')
+          const args = web3.eth.abi.decodeParameters(['address', 'address', 'uint256', 'bytes'], data.slice(10))
+          expect(args[0]).to.be.equal(token.address)
+          expect(args[1]).to.be.equal(otherSideToken1)
+          expect(args[2]).to.be.equal(value.toString())
+          expect(args[3]).to.be.equal('0x1122')
+
+          expect(dataType).to.be.equal('0')
+          expect(await contract.totalSpentPerDay(token.address, currentDay)).to.be.bignumber.equal(twoEthers)
+          expect(await contract.mediatorBalance(token.address)).to.be.bignumber.equal(twoEthers)
+          expect(await contract.isTokenRegistered(token.address)).to.be.equal(true)
+          expect(await token.balanceOf(contract.address)).to.be.bignumber.equal(twoEthers)
+          expect(await contract.maxAvailablePerTx(token.address)).to.be.bignumber.equal(halfEther)
+
+          const depositEvents = await getEvents(contract, { event: 'TokensBridgingInitiated' })
+          expect(depositEvents.length).to.be.equal(2)
+          expect(depositEvents[1].returnValues.token).to.be.equal(token.address)
+          expect(depositEvents[1].returnValues.sender).to.be.equal(user)
+          expect(depositEvents[1].returnValues.value).to.be.equal(value.toString())
+          expect(depositEvents[1].returnValues.messageId).to.include('0x11223344')
+        })
 
         commonRelayTests()
 
@@ -1030,6 +1068,109 @@ function runTests(accounts, isHome) {
 
         it('should not allow to operate when global shutdown is enabled', async () => {
           const data = contract.contract.methods.handleBridgedTokens(otherSideToken1, user, value).encodeABI()
+
+          await contract.setExecutionDailyLimit(ZERO_ADDRESS, ZERO).should.be.fulfilled
+
+          expect(await executeMessageCall(failedMessageId, data)).to.be.equal(false)
+
+          await contract.setExecutionDailyLimit(ZERO_ADDRESS, executionDailyLimit).should.be.fulfilled
+
+          expect(await executeMessageCall(otherMessageId, data)).to.be.equal(true)
+        })
+      })
+
+      describe('handleBridgedTokensAndCall', () => {
+        let deployedToken
+        let tokenReceiver
+        beforeEach(async () => {
+          const args = [otherSideToken1, 'Test', 'TST', 18, user, value]
+          const data = contract.contract.methods.deployAndHandleBridgedTokens(...args).encodeABI()
+
+          expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
+
+          const events = await getEvents(contract, { event: 'NewTokenRegistered' })
+          expect(events.length).to.be.equal(1)
+          const { nativeToken, bridgedToken } = events[0].returnValues
+          expect(nativeToken).to.be.equal(otherSideToken1)
+          deployedToken = await PermittableToken.at(bridgedToken)
+
+          expect(await contract.totalExecutedPerDay(deployedToken.address, currentDay)).to.be.bignumber.equal(value)
+          expect(await deployedToken.balanceOf(user)).to.be.bignumber.equal(value)
+          expect(await deployedToken.balanceOf(contract.address)).to.be.bignumber.equal(ZERO)
+
+          tokenReceiver = await TokenReceiver.new()
+        })
+
+        it('should mint existing tokens and call onTokenTransfer', async () => {
+          const args = [otherSideToken1, tokenReceiver.address, value, '0x1122']
+          // can't be called by user
+          await contract.handleBridgedTokensAndCall(...args, { from: user }).should.be.rejected
+          // can't be called by owner
+          await contract.handleBridgedTokensAndCall(...args, { from: owner }).should.be.rejected
+
+          const data = contract.contract.methods.handleBridgedTokensAndCall(...args).encodeABI()
+
+          // message must be generated by mediator contract on the other network
+          expect(await executeMessageCall(failedMessageId, data, { messageSender: owner })).to.be.equal(false)
+
+          expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
+
+          expect(await contract.totalExecutedPerDay(deployedToken.address, currentDay)).to.be.bignumber.equal(twoEthers)
+          expect(await contract.mediatorBalance(deployedToken.address)).to.be.bignumber.equal(ZERO)
+          expect(await deployedToken.balanceOf(tokenReceiver.address)).to.be.bignumber.equal(oneEther)
+          expect(await deployedToken.balanceOf(contract.address)).to.be.bignumber.equal(ZERO)
+          expect(await tokenReceiver.token()).to.be.equal(deployedToken.address)
+          expect(await tokenReceiver.from()).to.be.equal(contract.address)
+          expect(await tokenReceiver.value()).to.be.bignumber.equal(value)
+          expect(await tokenReceiver.data()).to.be.equal('0x1122')
+
+          const event = await getEvents(contract, { event: 'TokensBridged' })
+          expect(event.length).to.be.equal(2)
+          expect(event[1].returnValues.token).to.be.equal(deployedToken.address)
+          expect(event[1].returnValues.recipient).to.be.equal(tokenReceiver.address)
+          expect(event[1].returnValues.value).to.be.equal(value.toString())
+          expect(event[1].returnValues.messageId).to.be.equal(exampleMessageId)
+        })
+
+        it('should mint existing tokens and handle missing onTokenTransfer', async () => {
+          const args = [otherSideToken1, user, value, '0x1122']
+          // can't be called by user
+          await contract.handleBridgedTokensAndCall(...args, { from: user }).should.be.rejected
+          // can't be called by owner
+          await contract.handleBridgedTokensAndCall(...args, { from: owner }).should.be.rejected
+
+          const data = contract.contract.methods.handleBridgedTokensAndCall(...args).encodeABI()
+
+          // message must be generated by mediator contract on the other network
+          expect(await executeMessageCall(failedMessageId, data, { messageSender: owner })).to.be.equal(false)
+
+          expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
+
+          expect(await contract.totalExecutedPerDay(deployedToken.address, currentDay)).to.be.bignumber.equal(twoEthers)
+          expect(await contract.mediatorBalance(deployedToken.address)).to.be.bignumber.equal(ZERO)
+          expect(await deployedToken.balanceOf(user)).to.be.bignumber.equal(twoEthers)
+          expect(await deployedToken.balanceOf(contract.address)).to.be.bignumber.equal(ZERO)
+
+          const event = await getEvents(contract, { event: 'TokensBridged' })
+          expect(event.length).to.be.equal(2)
+          expect(event[1].returnValues.token).to.be.equal(deployedToken.address)
+          expect(event[1].returnValues.recipient).to.be.equal(user)
+          expect(event[1].returnValues.value).to.be.equal(value.toString())
+          expect(event[1].returnValues.messageId).to.be.equal(exampleMessageId)
+        })
+
+        it('should not allow to process unknown tokens', async () => {
+          const data = contract.contract.methods
+            .handleBridgedTokensAndCall(otherSideToken2, user, value, '0x00')
+            .encodeABI()
+
+          expect(await executeMessageCall(failedMessageId, data)).to.be.equal(false)
+        })
+
+        it('should not allow to operate when global shutdown is enabled', async () => {
+          const data = contract.contract.methods
+            .handleBridgedTokensAndCall(otherSideToken1, user, value, '0x00')
+            .encodeABI()
 
           await contract.setExecutionDailyLimit(ZERO_ADDRESS, ZERO).should.be.fulfilled
 
@@ -1713,9 +1854,9 @@ function runTests(accounts, isHome) {
   }
 }
 
-// contract('ForeignOmnibridge', (accounts) => {
-//   runTests(accounts, false)
-// })
+contract('ForeignOmnibridge', (accounts) => {
+  runTests(accounts, false)
+})
 
 contract('HomeOmnibridge', (accounts) => {
   runTests(accounts, true)

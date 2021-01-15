@@ -50,6 +50,45 @@ contract HomeOmnibridge is BasicOmnibridge, OmnibridgeFeeManagerConnector, Multi
     }
 
     /**
+     * @dev Handles the bridged tokens for the already registered token pair.
+     * Checks that the value is inside the execution limits and invokes the Mint or Unlock accordingly.
+     * @param _token address of the native ERC20/ERC677 token on the other side.
+     * @param _recipient address that will receive the tokens.
+     * @param _value amount of tokens to be received.
+     * @param _data additional transfer data passed from the other side.
+     */
+    function handleBridgedTokensAndCall(
+        address _token,
+        address _recipient,
+        uint256 _value,
+        bytes memory _data
+    ) external override onlyMediator {
+        address token = bridgedTokenAddress(_token);
+
+        require(withinExecutionLimit(token, _value));
+        addTotalExecutedPerDay(token, getCurrentDay(), _value);
+
+        uint256 valueToBridge = _value;
+        uint256 fee = _distributeFee(FOREIGN_TO_HOME_FEE, false, address(0), token, valueToBridge);
+        bytes32 _messageId = messageId();
+        if (fee > 0) {
+            emit FeeDistributed(fee, token, _messageId);
+            valueToBridge = valueToBridge.sub(fee);
+        }
+
+        _getMinterFor(token).mint(address(this), valueToBridge);
+        (bool status, ) =
+            token.call(
+                abi.encodeWithSelector(IERC677(token).transferAndCall.selector, _recipient, valueToBridge, _data)
+            );
+        if (!status) {
+            IERC677(token).transfer(_recipient, valueToBridge);
+        }
+
+        emit TokensBridged(token, _recipient, valueToBridge, _messageId);
+    }
+
+    /**
      * One-time function to be used together with upgradeToAndCall method.
      * Sets the token factory contract. Resumes token bridging in the home to foreign direction.
      * @param _tokenFactory address of the deployed TokenFactory contract.
@@ -130,12 +169,14 @@ contract HomeOmnibridge is BasicOmnibridge, OmnibridgeFeeManagerConnector, Multi
      * @param _from address of tokens sender
      * @param _receiver address of tokens receiver on the other side
      * @param _value requested amount of bridged tokens
+     * @param _data additional transfer data to be used on the other side
      */
     function bridgeSpecificActionsOnTokenTransfer(
         address _token,
         address _from,
         address _receiver,
-        uint256 _value
+        uint256 _value,
+        bytes memory _data
     ) internal override {
         uint8 decimals;
         bool isKnownToken = isTokenRegistered(_token);
@@ -153,7 +194,8 @@ contract HomeOmnibridge is BasicOmnibridge, OmnibridgeFeeManagerConnector, Multi
         uint256 fee = _distributeFee(HOME_TO_FOREIGN_FEE, isNativeToken, _from, _token, _value);
         uint256 valueToBridge = _value.sub(fee);
 
-        bytes memory data = _prepareMessage(isKnownToken, isNativeToken, _token, _receiver, valueToBridge, decimals);
+        bytes memory data =
+            _prepareMessage(isKnownToken, isNativeToken, _token, _receiver, valueToBridge, decimals, _data);
 
         bytes32 _messageId = _passMessage(data, _token, _from, _receiver);
         _recordBridgeOperation(!isKnownToken, _messageId, _token, _from, valueToBridge);

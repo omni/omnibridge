@@ -90,12 +90,14 @@ contract ForeignOmnibridge is BasicOmnibridge {
      * @param _from address of tokens sender
      * @param _receiver address of tokens receiver on the other side
      * @param _value requested amount of bridged tokens
+     * @param _data additional transfer data to be used on the other side
      */
     function bridgeSpecificActionsOnTokenTransfer(
         address _token,
         address _from,
         address _receiver,
-        uint256 _value
+        uint256 _value,
+        bytes memory _data
     ) internal virtual override {
         uint8 decimals;
         bool isKnownToken = isTokenRegistered(_token);
@@ -110,7 +112,7 @@ contract ForeignOmnibridge is BasicOmnibridge {
         require(withinLimit(_token, _value));
         addTotalSpentPerDay(_token, getCurrentDay(), _value);
 
-        bytes memory data = _prepareMessage(isKnownToken, isNativeToken, _token, _receiver, _value, decimals);
+        bytes memory data = _prepareMessage(isKnownToken, isNativeToken, _token, _receiver, _value, decimals, _data);
         bytes32 _messageId =
             bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), data, requestGasLimit());
         _recordBridgeOperation(!isKnownToken, _messageId, _token, _from, _value);

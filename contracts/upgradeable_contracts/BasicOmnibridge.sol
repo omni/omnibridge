@@ -28,7 +28,6 @@ abstract contract BasicOmnibridge is
     TokensRelayer,
     FailedMessagesProcessor,
     BridgedTokensRegistry,
-    NativeTokensRegistry,
     MediatorBalanceStorage,
     TokenFactoryConnector,
     TokensBridgeLimits
@@ -110,6 +109,35 @@ abstract contract BasicOmnibridge is
         require(isRegisteredAsNativeToken(_token));
 
         _handleTokens(_token, true, _recipient, _value);
+    }
+
+    /**
+     * @dev Handles the bridged tokens for the already registered token pair.
+     * Checks that the value is inside the execution limits and invokes the Mint or Unlock accordingly.
+     * @param _token address of the native ERC20/ERC677 token on the other side.
+     * @param _recipient address that will receive the tokens.
+     * @param _value amount of tokens to be received.
+     * @param _data additional transfer data passed from the other side.
+     */
+    function handleBridgedTokensAndCall(
+        address _token,
+        address _recipient,
+        uint256 _value,
+        bytes memory _data
+    ) external virtual onlyMediator {
+        address token = bridgedTokenAddress(_token);
+
+        require(withinExecutionLimit(token, _value));
+        addTotalExecutedPerDay(token, getCurrentDay(), _value);
+
+        _getMinterFor(token).mint(address(this), _value);
+        (bool status, ) =
+            token.call(abi.encodeWithSelector(IERC677(token).transferAndCall.selector, _recipient, _value, _data));
+        if (!status) {
+            IERC677(token).transfer(_recipient, _value);
+        }
+
+        emit TokensBridged(token, _recipient, _value, messageId());
     }
 
     /**
@@ -236,6 +264,7 @@ abstract contract BasicOmnibridge is
      * @param _receiver address of the tokens receiver on the other side.
      * @param _value bridged value.
      * @param _decimals token decimals parameter, required only if _isKnownToken is false.
+     * @param _data additional transfer data passed from the other side.
      */
     function _prepareMessage(
         bool _isKnownToken,
@@ -243,11 +272,16 @@ abstract contract BasicOmnibridge is
         address _token,
         address _receiver,
         uint256 _value,
-        uint8 _decimals
+        uint8 _decimals,
+        bytes memory _data
     ) internal returns (bytes memory) {
         // process already known token that is native w.r.t. current chain
         if (_isKnownToken && _isNativeToken) {
             _setMediatorBalance(_token, mediatorBalance(_token).add(_value));
+            if (msg.sig == this.relayTokensAndCall.selector) {
+                return
+                    abi.encodeWithSelector(this.handleBridgedTokensAndCall.selector, _token, _receiver, _value, _data);
+            }
             return abi.encodeWithSelector(this.handleBridgedTokens.selector, _token, _receiver, _value);
         }
 
