@@ -63,7 +63,7 @@ async function initializeMediator({
       mediatorContract,
       [dailyLimit.toString(), maxPerTx.toString(), minPerTx.toString()],
       [executionDailyLimit.toString(), executionMaxPerTx.toString()],
-      requestGasLimit,
+      requestGasLimit.toString(),
       owner,
       tokenFactory,
       rewardAddressList,

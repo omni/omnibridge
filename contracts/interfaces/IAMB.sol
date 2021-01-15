@@ -1,6 +1,16 @@
 pragma solidity 0.7.5;
 
 interface IAMB {
+    event UserRequestForAffirmation(bytes32 indexed messageId, bytes encodedData);
+    event UserRequestForSignature(bytes32 indexed messageId, bytes encodedData);
+    event AffirmationCompleted(
+        address indexed sender,
+        address indexed executor,
+        bytes32 indexed messageId,
+        bool status
+    );
+    event RelayedMessage(address indexed sender, address indexed executor, bytes32 indexed messageId, bool status);
+
     function messageSender() external view returns (address);
 
     function maxGasPerTx() external view returns (uint256);

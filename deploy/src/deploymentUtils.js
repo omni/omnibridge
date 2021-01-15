@@ -110,9 +110,7 @@ async function sendRawTx({ data, nonce, to, web3, gasPrice, value }) {
       value,
     }
 
-    const signedTx = await new Promise((res) =>
-      web3.eth.accounts.signTransaction(rawTx, DEPLOYMENT_ACCOUNT_PRIVATE_KEY, (err, signedTx) => res(signedTx))
-    )
+    const signedTx = await web3.eth.accounts.signTransaction(rawTx, DEPLOYMENT_ACCOUNT_PRIVATE_KEY)
     const receipt = await web3.eth
       .sendSignedTransaction(signedTx.rawTransaction)
       .once('transactionHash', (txHash) => console.log('pending txHash', txHash))
