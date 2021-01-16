@@ -32,7 +32,8 @@ contract HomeOmnibridge is BasicOmnibridge, OmnibridgeFeeManagerConnector, Multi
         uint256[2] calldata _executionDailyLimitExecutionMaxPerTxArray, // [ 0 = _executionDailyLimit, 1 = _executionMaxPerTx ]
         uint256 _requestGasLimit,
         address _owner,
-        address _tokenFactory
+        address _tokenFactory,
+        address _feeManager
     ) external onlyRelevantSender returns (bool) {
         require(!isInitialized());
 
@@ -43,6 +44,7 @@ contract HomeOmnibridge is BasicOmnibridge, OmnibridgeFeeManagerConnector, Multi
         _setRequestGasLimit(_requestGasLimit);
         _setOwner(_owner);
         _setTokenFactory(_tokenFactory);
+        _setFeeManager(_feeManager);
 
         setInitialize();
 

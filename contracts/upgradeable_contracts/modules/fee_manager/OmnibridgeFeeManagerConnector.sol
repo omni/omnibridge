@@ -46,6 +46,7 @@ abstract contract OmnibridgeFeeManagerConnector is Ownable {
     /**
      * @dev Internal function for calculating and distributing fee through the separate fee manager contract.
      * @param _feeType type of the fee, can be one of [HOME_TO_FOREIGN_FEE, FOREIGN_TO_HOME_FEE].
+     * @param _isNative true, if distributed token is native to this side of the bridge.
      * @param _from address of the tokens sender, needed only if _feeType is HOME_TO_FOREIGN_FEE.
      * @param _token address of the token contract, for which fee should be processed.
      * @param _value amount of tokens bridged.

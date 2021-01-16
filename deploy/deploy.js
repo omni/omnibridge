@@ -18,13 +18,14 @@ async function deployOmnibridge() {
   const initializeHome = require('./src/omnibridge/initializeHome')
   const initializeForeign = require('./src/omnibridge/initializeForeign')
   await preDeploy()
-  const { homeBridgeMediator, tokenFactory: homeTokenFactory } = await deployHome()
+  const { homeBridgeMediator, tokenFactory: homeTokenFactory, feeManager } = await deployHome()
   const { foreignBridgeMediator, tokenFactory: foreignTokenFactory } = await deployForeign()
 
   await initializeHome({
     homeBridge: homeBridgeMediator.address,
     foreignBridge: foreignBridgeMediator.address,
     tokenFactory: homeTokenFactory.address,
+    feeManager: feeManager.address,
   })
 
   await initializeForeign({

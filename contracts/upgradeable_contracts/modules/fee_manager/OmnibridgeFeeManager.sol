@@ -96,10 +96,10 @@ contract OmnibridgeFeeManager is MediatorOwnableModule {
         // use token-specific fee if one is registered
         uint256 _tokenFee = fees[_feeType][_token];
         if (_tokenFee > 0) {
-            return _tokenFee - MAX_FEE;
+            return _tokenFee - 1;
         }
         // use default fee otherwise
-        return fees[_feeType][address(0)] - MAX_FEE;
+        return fees[_feeType][address(0)] - 1;
     }
 
     /**
@@ -227,7 +227,7 @@ contract OmnibridgeFeeManager is MediatorOwnableModule {
         address _token,
         uint256 _fee
     ) internal validFee(_fee) {
-        fees[_feeType][_token] = MAX_FEE + _fee;
+        fees[_feeType][_token] = 1 + _fee;
         emit FeeUpdated(_feeType, _token, _fee);
     }
 

@@ -69,6 +69,9 @@ function runTests(accounts, isHome) {
       opts.owner || owner,
       opts.tokenFactory || tokenFactory.address,
     ]
+    if (isHome) {
+      args.push(opts.feeManager || ZERO_ADDRESS)
+    }
     return contract.initialize(...args)
   }
 
