@@ -9,12 +9,9 @@ async function run({ foreign, home }) {
 
   console.log('Sending 10 tokens to the Home Mediator with extra data')
   await token.methods.approve(mediator.options.address, value).send()
-  const receipt1 = await mediator.methods.relayTokensAndCall(
-    token.options.address,
-    tokenReceiver.options.address,
-    value,
-    '0x1122'
-  ).send()
+  const receipt1 = await mediator.methods
+    .relayTokensAndCall(token.options.address, tokenReceiver.options.address, value, '0x1122')
+    .send()
   const relayTxHash1 = await foreign.waitUntilProcessed(receipt1)
   const bridgedToken = await foreign.getBridgedToken(token)
 
