@@ -83,6 +83,8 @@ contract HomeOmnibridge is BasicOmnibridge, OmnibridgeFeeManagerConnector, Multi
             token.call(
                 abi.encodeWithSelector(IERC677(token).transferAndCall.selector, _recipient, valueToBridge, _data)
             );
+        // if the ERC677 transferAndCall will fail due to some issues with the receiver's contract onTokenTransfer implementation,
+        // tokens bridging still should be completed, therefore, in such cases, a regular ERC20 transfer will be used.
         if (!status) {
             IERC677(token).transfer(_recipient, valueToBridge);
         }
