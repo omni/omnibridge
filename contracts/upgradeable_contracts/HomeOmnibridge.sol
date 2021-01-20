@@ -132,18 +132,6 @@ contract HomeOmnibridge is BasicOmnibridge, OmnibridgeFeeManagerConnector, Multi
     }
 
     /**
-     * @dev One-time upgrade function for transferring ownership of the STAKE token to the TokenMinter address.
-     * Should be called together with upgradeToAndCall function
-     */
-    function transferTokenOwnership() external {
-        require(msg.sender == address(this));
-
-        Ownable(0xb7D311E2Eb55F2f68a9440da38e7989210b9A05e).transferOwnership(
-            0x1111111111111111111111111111111111111111
-        );
-    }
-
-    /**
      * @dev Handles the bridged tokens.
      * Checks that the value is inside the execution limits and invokes the Mint or Unlock accordingly.
      * @param _token token contract address on this side of the bridge.
