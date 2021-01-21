@@ -41,6 +41,7 @@ function runTests(accounts, isHome) {
   let currentDay
   let tokenImage
   let tokenFactory
+  let tokenReceiver
   const owner = accounts[0]
   const user = accounts[1]
   const user2 = accounts[2]
@@ -101,6 +102,17 @@ function runTests(accounts, isHome) {
         () => user2
       )
     },
+    async function alternativeReceiverWithData(value = oneEther) {
+      return token
+        .transferAndCall(contract.address, value, `${tokenReceiver.address}1122`, { from: user })
+        .then(() => tokenReceiver.address)
+    },
+    async function relayTokensWithData(value = oneEther) {
+      await token.approve(contract.address, value, { from: user }).should.be.fulfilled
+      return contract
+        .relayTokensAndCall(token.address, tokenReceiver.address, value, '0x1122', { from: user })
+        .then(() => tokenReceiver.address)
+    },
   ]
 
   before(async () => {
@@ -116,6 +128,7 @@ function runTests(accounts, isHome) {
     ambBridgeContract = await AMBMock.new()
     token = await ERC677BridgeToken.new('TEST', 'TST', 18)
     currentDay = await contract.getCurrentDay()
+    tokenReceiver = await TokenReceiver.new()
   })
 
   describe('getBridgeMode', () => {
@@ -434,12 +447,22 @@ function runTests(accounts, isHome) {
             let events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
             expect(events.length).to.be.equal(1)
             const { data, messageId, dataType, executor } = events[0].returnValues
-            expect(data.slice(2, 10)).to.be.equal('2ae87cdd')
-            const args = web3.eth.abi.decodeParameters(
-              ['address', 'string', 'string', 'uint8', 'address', 'uint256'],
-              data.slice(10)
-            )
             expect(executor).to.be.equal(otherSideMediator)
+            let args
+            if (receiver === tokenReceiver.address) {
+              expect(data.slice(2, 10)).to.be.equal('d522cfd7') // deployAndHandleBridgedTokensAndCall
+              args = web3.eth.abi.decodeParameters(
+                ['address', 'string', 'string', 'uint8', 'address', 'uint256', 'bytes'],
+                data.slice(10)
+              )
+              expect(args[6]).to.be.equal('0x1122')
+            } else {
+              expect(data.slice(2, 10)).to.be.equal('2ae87cdd') // deployAndHandleBridgedTokens
+              args = web3.eth.abi.decodeParameters(
+                ['address', 'string', 'string', 'uint8', 'address', 'uint256'],
+                data.slice(10)
+              )
+            }
             expect(args[0]).to.be.equal(token.address)
             expect(args[1]).to.be.equal(await token.name())
             expect(args[2]).to.be.equal(await token.symbol())
@@ -454,8 +477,15 @@ function runTests(accounts, isHome) {
             events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
             expect(events.length).to.be.equal(2)
             const { data: data2, dataType: dataType2 } = events[1].returnValues
-            expect(data2.slice(2, 10)).to.be.equal('125e4cfb')
-            const args2 = web3.eth.abi.decodeParameters(['address', 'address', 'uint256'], data2.slice(10))
+            let args2
+            if (receiver === tokenReceiver.address) {
+              expect(data2.slice(2, 10)).to.be.equal('c5345761') // handleBridgedTokensAndCall
+              args2 = web3.eth.abi.decodeParameters(['address', 'address', 'uint256', 'bytes'], data2.slice(10))
+              expect(args2[3]).to.be.equal('0x1122')
+            } else {
+              expect(data2.slice(2, 10)).to.be.equal('125e4cfb') // handleBridgedTokens
+              args2 = web3.eth.abi.decodeParameters(['address', 'address', 'uint256'], data2.slice(10))
+            }
             expect(args2[0]).to.be.equal(token.address)
             expect(args2[1]).to.be.equal(receiver)
             expect(args2[2]).to.be.equal(value.toString())
@@ -718,6 +748,71 @@ function runTests(accounts, isHome) {
         })
       })
 
+      describe('handleNativeTokensAndCall', () => {
+        it('should unlock tokens on message from amb', async () => {
+          await token.transferAndCall(contract.address, value, '0x', { from: user }).should.be.fulfilled
+          await token.transferAndCall(contract.address, value, '0x', { from: user }).should.be.fulfilled
+
+          expect(await token.balanceOf(contract.address)).to.be.bignumber.equal(twoEthers)
+          expect(await contract.mediatorBalance(token.address)).to.be.bignumber.equal(twoEthers)
+
+          const args = [token.address, tokenReceiver.address, value, '0x5566']
+          // can't be called by user
+          await contract.handleNativeTokensAndCall(...args, { from: user }).should.be.rejected
+
+          // can't be called by owner
+          await contract.handleNativeTokensAndCall(...args, { from: owner }).should.be.rejected
+
+          const data = await contract.contract.methods.handleNativeTokensAndCall(...args).encodeABI()
+
+          // message must be generated by mediator contract on the other network
+          expect(await executeMessageCall(failedMessageId, data, { messageSender: owner })).to.be.equal(false)
+
+          expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
+
+          expect(await contract.totalExecutedPerDay(token.address, currentDay)).to.be.bignumber.equal(value)
+          expect(await contract.mediatorBalance(token.address)).to.be.bignumber.equal(value)
+          expect(await token.balanceOf(tokenReceiver.address)).to.be.bignumber.equal(ether('1'))
+          expect(await token.balanceOf(contract.address)).to.be.bignumber.equal(value)
+
+          const event = await getEvents(contract, { event: 'TokensBridged' })
+          expect(event.length).to.be.equal(1)
+          expect(event[0].returnValues.token).to.be.equal(token.address)
+          expect(event[0].returnValues.recipient).to.be.equal(tokenReceiver.address)
+          expect(event[0].returnValues.value).to.be.equal(value.toString())
+          expect(event[0].returnValues.messageId).to.be.equal(exampleMessageId)
+
+          expect(await tokenReceiver.data()).to.be.equal('0x5566')
+        })
+
+        it('should not allow to use unregistered tokens', async () => {
+          const otherToken = await ERC677BridgeToken.new('Test', 'TST', 18)
+          await otherToken.mint(contract.address, value)
+          const data = await contract.contract.methods
+            .handleNativeTokens(otherToken.address, user, value.toString())
+            .encodeABI()
+
+          expect(await executeMessageCall(failedMessageId, data)).to.be.equal(false)
+        })
+
+        it('should not allow to operate when global shutdown is enabled', async () => {
+          await token.transferAndCall(contract.address, value, '0x', { from: user }).should.be.fulfilled
+          await token.transferAndCall(contract.address, value, '0x', { from: user }).should.be.fulfilled
+
+          const data = await contract.contract.methods
+            .handleNativeTokens(token.address, user, value.toString())
+            .encodeABI()
+
+          await contract.setExecutionDailyLimit(ZERO_ADDRESS, ZERO).should.be.fulfilled
+
+          expect(await executeMessageCall(failedMessageId, data)).to.be.equal(false)
+
+          await contract.setExecutionDailyLimit(ZERO_ADDRESS, executionDailyLimit).should.be.fulfilled
+
+          expect(await executeMessageCall(otherMessageId, data)).to.be.equal(true)
+        })
+      })
+
       describe('requestFailedMessageFix', () => {
         let msgData
         beforeEach(async () => {
@@ -792,8 +887,15 @@ function runTests(accounts, isHome) {
             let events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
             expect(events.length).to.be.equal(1)
             const { data, dataType, executor } = events[0].returnValues
-            expect(data.slice(2, 10)).to.be.equal('272255bb')
-            const args = web3.eth.abi.decodeParameters(['address', 'address', 'uint256'], data.slice(10))
+            let args
+            if (receiver === tokenReceiver.address) {
+              expect(data.slice(2, 10)).to.be.equal('867f7a4d') // handleNativeTokensAndCall
+              args = web3.eth.abi.decodeParameters(['address', 'address', 'uint256', 'bytes'], data.slice(10))
+              expect(args[3]).to.be.equal('0x1122')
+            } else {
+              expect(data.slice(2, 10)).to.be.equal('272255bb') // handleNativeTokens
+              args = web3.eth.abi.decodeParameters(['address', 'address', 'uint256'], data.slice(10))
+            }
             expect(executor).to.be.equal(otherSideMediator)
             expect(args[0]).to.be.equal(otherSideToken1)
             expect(args[1]).to.be.equal(receiver)
@@ -807,8 +909,15 @@ function runTests(accounts, isHome) {
             events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
             expect(events.length).to.be.equal(2)
             const { data: data2, dataType: dataType2 } = events[1].returnValues
-            expect(data2.slice(2, 10)).to.be.equal('272255bb')
-            const args2 = web3.eth.abi.decodeParameters(['address', 'address', 'uint256'], data2.slice(10))
+            let args2
+            if (receiver === tokenReceiver.address) {
+              expect(data2.slice(2, 10)).to.be.equal('867f7a4d') // handleNativeTokensAndCall
+              args2 = web3.eth.abi.decodeParameters(['address', 'address', 'uint256', 'bytes'], data2.slice(10))
+              expect(args2[3]).to.be.equal('0x1122')
+            } else {
+              expect(data2.slice(2, 10)).to.be.equal('272255bb') // handleNativeTokens
+              args2 = web3.eth.abi.decodeParameters(['address', 'address', 'uint256'], data2.slice(10))
+            }
             expect(args2[0]).to.be.equal(otherSideToken1)
             expect(args2[1]).to.be.equal(receiver)
             expect(args2[2]).to.be.equal(value.toString())
@@ -1017,6 +1126,53 @@ function runTests(accounts, isHome) {
         })
       })
 
+      describe('deployAndHandleBridgedTokensAndCall', () => {
+        it('should deploy contract and mint tokens on first message from amb', async () => {
+          // can't be called by user
+          const args = [otherSideToken1, 'Test', 'TST', 18, tokenReceiver.address, value, '0x5566']
+          await contract.deployAndHandleBridgedTokensAndCall(...args, { from: user }).should.be.rejected
+
+          // can't be called by owner
+          await contract.deployAndHandleBridgedTokensAndCall(...args, { from: owner }).should.be.rejected
+
+          const data = contract.contract.methods.deployAndHandleBridgedTokensAndCall(...args).encodeABI()
+
+          // message must be generated by mediator contract on the other network
+          expect(await executeMessageCall(failedMessageId, data, { messageSender: owner })).to.be.equal(false)
+
+          expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
+
+          const events = await getEvents(contract, { event: 'NewTokenRegistered' })
+          expect(events.length).to.be.equal(1)
+          const { nativeToken, bridgedToken } = events[0].returnValues
+          expect(nativeToken).to.be.equal(otherSideToken1)
+          const deployedToken = await PermittableToken.at(bridgedToken)
+
+          expect(await deployedToken.name()).to.be.equal(modifyName('Test'))
+          expect(await deployedToken.symbol()).to.be.equal('TST')
+          expect(await deployedToken.decimals()).to.be.bignumber.equal('18')
+          expect(await contract.nativeTokenAddress(bridgedToken)).to.be.equal(nativeToken)
+          expect(await contract.bridgedTokenAddress(nativeToken)).to.be.equal(bridgedToken)
+          if (isHome) {
+            expect(await contract.foreignTokenAddress(bridgedToken)).to.be.equal(nativeToken)
+            expect(await contract.homeTokenAddress(nativeToken)).to.be.equal(bridgedToken)
+          }
+          expect(await contract.totalExecutedPerDay(deployedToken.address, currentDay)).to.be.bignumber.equal(value)
+          expect(await contract.mediatorBalance(deployedToken.address)).to.be.bignumber.equal(ZERO)
+          expect(await deployedToken.balanceOf(tokenReceiver.address)).to.be.bignumber.equal(value)
+          expect(await deployedToken.balanceOf(contract.address)).to.be.bignumber.equal(ZERO)
+
+          const event = await getEvents(contract, { event: 'TokensBridged' })
+          expect(event.length).to.be.equal(1)
+          expect(event[0].returnValues.token).to.be.equal(deployedToken.address)
+          expect(event[0].returnValues.recipient).to.be.equal(tokenReceiver.address)
+          expect(event[0].returnValues.value).to.be.equal(value.toString())
+          expect(event[0].returnValues.messageId).to.be.equal(exampleMessageId)
+
+          expect(await tokenReceiver.data()).to.be.equal('0x5566')
+        })
+      })
+
       describe('handleBridgedTokens', () => {
         let deployedToken
         beforeEach(async () => {
@@ -1084,7 +1240,6 @@ function runTests(accounts, isHome) {
 
       describe('handleBridgedTokensAndCall', () => {
         let deployedToken
-        let tokenReceiver
         beforeEach(async () => {
           const args = [otherSideToken1, 'Test', 'TST', 18, user, value]
           const data = contract.contract.methods.deployAndHandleBridgedTokens(...args).encodeABI()
@@ -1100,8 +1255,6 @@ function runTests(accounts, isHome) {
           expect(await contract.totalExecutedPerDay(deployedToken.address, currentDay)).to.be.bignumber.equal(value)
           expect(await deployedToken.balanceOf(user)).to.be.bignumber.equal(value)
           expect(await deployedToken.balanceOf(contract.address)).to.be.bignumber.equal(ZERO)
-
-          tokenReceiver = await TokenReceiver.new()
         })
 
         it('should mint existing tokens and call onTokenTransfer', async () => {

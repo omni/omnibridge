@@ -5,13 +5,12 @@ import "../../../interfaces/IERC677.sol";
 import "../../../libraries/Bytes.sol";
 import "../../ReentrancyGuard.sol";
 import "../../BasicAMBMediator.sol";
-import "../native/NativeTokensRegistry.sol";
 
 /**
  * @title TokensRelayer
  * @dev Functionality for bridging multiple tokens to the other side of the bridge.
  */
-abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard, NativeTokensRegistry {
+abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard {
     using SafeERC20 for IERC677;
 
     /**
@@ -24,9 +23,27 @@ abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard, NativeToke
         address _from,
         uint256 _value,
         bytes calldata _data
-    ) public returns (bool) {
+    ) external returns (bool) {
         if (!lock()) {
-            bridgeSpecificActionsOnTokenTransfer(msg.sender, _from, chooseReceiver(_from, _data), _value, new bytes(0));
+            bytes memory data = new bytes(0);
+            address receiver = _from;
+            if (_data.length >= 20) {
+                assembly {
+                    receiver := calldataload(120)
+                }
+                require(receiver != address(0));
+                require(receiver != mediatorContractOnOtherSide());
+                if (_data.length > 20) {
+                    assembly {
+                        data := mload(0x40)
+                        let size := sub(calldataload(100), 20)
+                        mstore(data, size)
+                        calldatacopy(add(data, 32), 152, size)
+                        mstore(0x40, add(add(data, 32), size))
+                    }
+                }
+            }
+            bridgeSpecificActionsOnTokenTransfer(msg.sender, _from, receiver, _value, data);
         }
         return true;
     }
@@ -70,8 +87,6 @@ abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard, NativeToke
         uint256 _value,
         bytes memory _data
     ) external {
-        require(isRegisteredAsNativeToken(address(token)));
-
         _relayTokens(token, _receiver, _value, _data);
     }
 
@@ -99,22 +114,6 @@ abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard, NativeToke
         token.safeTransferFrom(msg.sender, address(this), _value);
         setLock(false);
         bridgeSpecificActionsOnTokenTransfer(address(token), msg.sender, _receiver, _value, _data);
-    }
-
-    /**
-     * @dev Helper function for alternative receiver feature. Chooses the actual receiver out of sender and passed data.
-     * @param _from address of tokens sender.
-     * @param _data passed data in the transfer message.
-     * @return recipient address of the receiver on the other side.
-     */
-    function chooseReceiver(address _from, bytes memory _data) internal view returns (address recipient) {
-        recipient = _from;
-        if (_data.length > 0) {
-            require(_data.length == 20);
-            recipient = Bytes.bytesToAddress(_data);
-            require(recipient != address(0));
-            require(recipient != mediatorContractOnOtherSide());
-        }
     }
 
     function bridgeSpecificActionsOnTokenTransfer(

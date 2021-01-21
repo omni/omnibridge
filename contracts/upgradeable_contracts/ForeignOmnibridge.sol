@@ -62,24 +62,24 @@ contract ForeignOmnibridge is BasicOmnibridge {
      * @dev Handles the bridged tokens.
      * Checks that the value is inside the execution limits and invokes the Mint or Unlock accordingly.
      * @param _token token contract address on this side of the bridge.
+     * @param _withData true, if transferAndCall should be used for releasing tokens.
      * @param _isNative true, if given token is native to this chain and Unlock should be used.
      * @param _recipient address that will receive the tokens.
      * @param _value amount of tokens to be received.
+     * @param _data additional data passed from the other side of the bridge.
      */
     function _handleTokens(
         address _token,
+        bool _withData,
         bool _isNative,
         address _recipient,
-        uint256 _value
+        uint256 _value,
+        bytes memory _data
     ) internal override {
         require(withinExecutionLimit(_token, _value));
         addTotalExecutedPerDay(_token, getCurrentDay(), _value);
 
-        if (_isNative) {
-            _releaseTokens(_token, _recipient, _value);
-        } else {
-            _getMinterFor(_token).mint(_recipient, _value);
-        }
+        _releaseTokens(_withData, _isNative, _token, _recipient, _value, _value, _data);
 
         emit TokensBridged(_token, _recipient, _value, messageId());
     }
@@ -99,6 +99,9 @@ contract ForeignOmnibridge is BasicOmnibridge {
         uint256 _value,
         bytes memory _data
     ) internal virtual override {
+        require(_receiver != address(0));
+        require(_receiver != mediatorContractOnOtherSide());
+
         uint8 decimals;
         bool isKnownToken = isTokenRegistered(_token);
         bool isNativeToken = !isKnownToken || isRegisteredAsNativeToken(_token);
@@ -120,34 +123,50 @@ contract ForeignOmnibridge is BasicOmnibridge {
 
     /**
      * Internal function for unlocking some amount of tokens.
-     * When bridging STAKE token, the insufficient amount of tokens can be additionally minted.
      * @param _token address of the token contract.
      * @param _recipient address of the tokens receiver.
      * @param _value amount of tokens to unlock.
      */
     function _releaseTokens(
+        bool _withData,
+        bool _isNative,
         address _token,
         address _recipient,
-        uint256 _value
+        uint256 _value,
+        uint256 _balanceChange,
+        bytes memory _data
     ) internal override {
-        uint256 balance = mediatorBalance(_token);
-
-        // STAKE total supply on xDai can be higher than the native STAKE supply on Mainnet
-        // Omnibridge is allowed to mint extra native STAKE tokens.
-        if (_token == address(0x0Ae055097C6d159879521C384F1D2123D1f195e6) && balance < _value) {
-            // if all locked tokens were already withdrawn, mint new tokens directly to receiver
-            // mediatorBalance(STAKE) remains 0 in this case.
-            if (balance == 0) {
-                IBurnableMintableERC677Token(_token).mint(_recipient, _value);
-                return;
+        uint256 balance;
+        if (_isNative) {
+            balance = mediatorBalance(_token);
+            if (_token == address(0x0Ae055097C6d159879521C384F1D2123D1f195e6) && balance < _value) {
+                IBurnableMintableERC677Token(_token).mint(address(this), _value - balance);
+                balance = _value;
             }
-
-            // otherwise, first mint insufficient tokens to the contract
-            IBurnableMintableERC677Token(_token).mint(address(this), _value - balance);
-            balance = _value;
         }
-        IERC677(_token).safeTransfer(_recipient, _value);
-        _setMediatorBalance(_token, balance.sub(_value));
+        if (_withData) {
+            if (!_isNative) {
+                _getMinterFor(_token).mint(address(this), _value);
+            }
+            (bool status, ) =
+                _token.call(
+                    abi.encodeWithSelector(IERC677(_token).transferAndCall.selector, _recipient, _value, _data)
+                );
+            // if the ERC677 transferAndCall will fail due to some issues with the receiver's contract onTokenTransfer implementation,
+            // tokens bridging still should be completed, therefore, in such cases, a regular ERC20 transfer will be used.
+            if (!status) {
+                IERC677(_token).transfer(_recipient, _value);
+            }
+        } else {
+            if (_isNative) {
+                IERC677(_token).safeTransfer(_recipient, _value);
+            } else {
+                _getMinterFor(_token).mint(_recipient, _value);
+            }
+        }
+        if (_isNative) {
+            _setMediatorBalance(_token, balance.sub(_balanceChange));
+        }
     }
 
     /**

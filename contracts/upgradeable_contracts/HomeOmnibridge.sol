@@ -52,47 +52,6 @@ contract HomeOmnibridge is BasicOmnibridge, OmnibridgeFeeManagerConnector, Multi
     }
 
     /**
-     * @dev Handles the bridged tokens for the already registered token pair.
-     * Checks that the value is inside the execution limits and invokes the Mint or Unlock accordingly.
-     * @param _token address of the native ERC20/ERC677 token on the other side.
-     * @param _recipient address that will receive the tokens.
-     * @param _value amount of tokens to be received.
-     * @param _data additional transfer data passed from the other side.
-     */
-    function handleBridgedTokensAndCall(
-        address _token,
-        address _recipient,
-        uint256 _value,
-        bytes memory _data
-    ) external override onlyMediator {
-        address token = bridgedTokenAddress(_token);
-
-        require(withinExecutionLimit(token, _value));
-        addTotalExecutedPerDay(token, getCurrentDay(), _value);
-
-        uint256 valueToBridge = _value;
-        uint256 fee = _distributeFee(FOREIGN_TO_HOME_FEE, false, address(0), token, valueToBridge);
-        bytes32 _messageId = messageId();
-        if (fee > 0) {
-            emit FeeDistributed(fee, token, _messageId);
-            valueToBridge = valueToBridge.sub(fee);
-        }
-
-        _getMinterFor(token).mint(address(this), valueToBridge);
-        (bool status, ) =
-            token.call(
-                abi.encodeWithSelector(IERC677(token).transferAndCall.selector, _recipient, valueToBridge, _data)
-            );
-        // if the ERC677 transferAndCall will fail due to some issues with the receiver's contract onTokenTransfer implementation,
-        // tokens bridging still should be completed, therefore, in such cases, a regular ERC20 transfer will be used.
-        if (!status) {
-            IERC677(token).transfer(_recipient, valueToBridge);
-        }
-
-        emit TokensBridged(token, _recipient, valueToBridge, _messageId);
-    }
-
-    /**
      * One-time function to be used together with upgradeToAndCall method.
      * Sets the token factory contract. Resumes token bridging in the home to foreign direction.
      * @param _tokenFactory address of the deployed TokenFactory contract.
@@ -135,15 +94,19 @@ contract HomeOmnibridge is BasicOmnibridge, OmnibridgeFeeManagerConnector, Multi
      * @dev Handles the bridged tokens.
      * Checks that the value is inside the execution limits and invokes the Mint or Unlock accordingly.
      * @param _token token contract address on this side of the bridge.
+     * @param _withData true, if transferAndCall should be used for releasing tokens.
      * @param _isNative true, if given token is native to this chain and Unlock should be used.
      * @param _recipient address that will receive the tokens.
      * @param _value amount of tokens to be received.
+     * @param _data additional data passed from the other side of the bridge.
      */
     function _handleTokens(
         address _token,
+        bool _withData,
         bool _isNative,
         address _recipient,
-        uint256 _value
+        uint256 _value,
+        bytes memory _data
     ) internal override {
         require(withinExecutionLimit(_token, _value));
         addTotalExecutedPerDay(_token, getCurrentDay(), _value);
@@ -156,13 +119,7 @@ contract HomeOmnibridge is BasicOmnibridge, OmnibridgeFeeManagerConnector, Multi
             valueToBridge = valueToBridge.sub(fee);
         }
 
-        if (_isNative) {
-            // not _releaseTokens(_token, _recipient, _value), since valueToBridge < _value
-            IERC677(_token).safeTransfer(_recipient, valueToBridge);
-            _setMediatorBalance(_token, mediatorBalance(_token).sub(_value));
-        } else {
-            _getMinterFor(_token).mint(_recipient, valueToBridge);
-        }
+        _releaseTokens(_withData, _isNative, _token, _recipient, valueToBridge, _value, _data);
 
         emit TokensBridged(_token, _recipient, valueToBridge, _messageId);
     }
@@ -182,6 +139,8 @@ contract HomeOmnibridge is BasicOmnibridge, OmnibridgeFeeManagerConnector, Multi
         uint256 _value,
         bytes memory _data
     ) internal override {
+        require(_receiver != address(0) && _receiver != mediatorContractOnOtherSide());
+
         uint8 decimals;
         bool isKnownToken = isTokenRegistered(_token);
         bool isNativeToken = !isKnownToken || isRegisteredAsNativeToken(_token);
