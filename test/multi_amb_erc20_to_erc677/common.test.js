@@ -189,7 +189,7 @@ function runTests(accounts, isHome) {
       expect(await contract.minPerTx(ZERO_ADDRESS)).to.be.bignumber.equal(ZERO)
       expect(await contract.executionDailyLimit(ZERO_ADDRESS)).to.be.bignumber.equal(ZERO)
       expect(await contract.executionMaxPerTx(ZERO_ADDRESS)).to.be.bignumber.equal(ZERO)
-      expect(await contract.requestGasLimit()).to.be.bignumber.equal(ZERO)
+      expect(await contract.requestGasLimit('0x00000000')).to.be.bignumber.equal(ZERO)
       expect(await contract.owner()).to.be.equal(ZERO_ADDRESS)
       expect(await contract.tokenFactory()).to.be.equal(ZERO_ADDRESS)
       if (isHome) {
@@ -243,7 +243,7 @@ function runTests(accounts, isHome) {
       expect(await contract.minPerTx(ZERO_ADDRESS)).to.be.bignumber.equal(minPerTx)
       expect(await contract.executionDailyLimit(ZERO_ADDRESS)).to.be.bignumber.equal(executionDailyLimit)
       expect(await contract.executionMaxPerTx(ZERO_ADDRESS)).to.be.bignumber.equal(executionMaxPerTx)
-      expect(await contract.requestGasLimit()).to.be.bignumber.equal('1000000')
+      expect(await contract.requestGasLimit('0x00000000')).to.be.bignumber.equal('1000000')
       expect(await contract.owner()).to.be.equal(owner)
       expect(await contract.tokenFactory()).to.be.equal(tokenFactory.address)
       if (isHome) {
@@ -377,6 +377,16 @@ function runTests(accounts, isHome) {
           await contract.setTokenFactory(newTokenFactory.address, { from: owner }).should.be.fulfilled
 
           expect(await contract.tokenFactory()).to.be.equal(newTokenFactory.address)
+        })
+      })
+
+      describe('request gas limit', () => {
+        it('should allow to set request gas limit for specific selector', async () => {
+          await contract.setRequestGasLimit('0xffffffff', 200000, { from: user }).should.be.rejected
+          await contract.setRequestGasLimit('0xffffffff', 200000, { from: owner }).should.be.fulfilled
+
+          expect(await contract.requestGasLimit('0xffffffff')).to.be.bignumber.equal('200000')
+          expect(await contract.requestGasLimit('0x00000000')).to.be.bignumber.equal('1000000')
         })
       })
     })

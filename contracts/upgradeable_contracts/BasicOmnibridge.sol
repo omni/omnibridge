@@ -184,8 +184,7 @@ abstract contract BasicOmnibridge is
 
         bytes memory data = abi.encodeWithSelector(this.handleBridgedTokens.selector, _token, _receiver, diff);
 
-        bytes32 _messageId =
-            bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), data, requestGasLimit());
+        bytes32 _messageId = _passMessage(data, true);
         _recordBridgeOperation(false, _messageId, _token, _receiver, diff);
     }
 

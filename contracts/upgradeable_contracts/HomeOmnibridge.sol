@@ -45,7 +45,7 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
         _setMediatorContractOnOtherSide(_mediatorContract);
         _setLimits(address(0), _dailyLimitMaxPerTxMinPerTxArray);
         _setExecutionLimits(address(0), _executionDailyLimitExecutionMaxPerTxArray);
-        _setRequestGasLimit(_requestGasLimit);
+        _setRequestGasLimit(0x00000000, _requestGasLimit);
         _setOwner(_owner);
         _setTokenFactory(_tokenFactory);
         if (_rewardAddresses.length > 0) {
@@ -173,7 +173,8 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
 
         bytes memory data = _prepareMessage(isKnownToken, isNativeToken, _token, _receiver, valueToBridge, decimals);
 
-        bytes32 _messageId = _passMessage(data, _token, _from, _receiver);
+        // Address of the home token is used here for determining lane permissions.
+        bytes32 _messageId = _passMessage(data, _isOracleDrivenLaneAllowed(_token, _from, _receiver));
         _recordBridgeOperation(!isKnownToken, _messageId, _token, _from, valueToBridge);
         if (fee > 0) {
             emit FeeDistributed(fee, _token, _messageId);
@@ -181,27 +182,25 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
     }
 
     /**
-     * @dev Internal function for sending an AMB message.
-     * Takes into account forwarding rules from forwardingRulesManager().
+     * @dev Internal function for sending an AMB message to the mediator on the other side.
      * @param _data data to be sent to the other side of the bridge.
-     * @param _token address of the home token contract within the bridged pair.
-     * @param _from address of the tokens sender.
-     * @param _receiver address of the tokens receiver on the other side.
+     * @param _useOracleLane true, if the message should be sent to the oracle driven lane.
      * @return id of the sent message.
      */
-    function _passMessage(
-        bytes memory _data,
-        address _token,
-        address _from,
-        address _receiver
-    ) internal returns (bytes32) {
+    function _passMessage(bytes memory _data, bool _useOracleLane) internal override returns (bytes32) {
         address executor = mediatorContractOnOtherSide();
-        uint256 gasLimit = requestGasLimit();
+        bytes4 selector;
+        assembly {
+            selector := shl(mload(add(_data, 4)), 224)
+        }
+        uint256 gasLimit = requestGasLimit(selector);
+        if (gasLimit == 0) {
+            gasLimit = requestGasLimit(0x00000000);
+        }
         IAMB bridge = bridgeContract();
 
-        // Address of the home token is used here for determining lane permissions.
         return
-            _isOracleDrivenLaneAllowed(_token, _from, _receiver)
+            _useOracleLane
                 ? bridge.requireToPassMessage(executor, _data, gasLimit)
                 : bridge.requireToConfirmMessage(executor, _data, gasLimit);
     }

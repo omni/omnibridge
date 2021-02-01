@@ -38,7 +38,7 @@ contract ForeignOmnibridge is BasicOmnibridge {
         _setMediatorContractOnOtherSide(_mediatorContract);
         _setLimits(address(0), _dailyLimitMaxPerTxMinPerTxArray);
         _setExecutionLimits(address(0), _executionDailyLimitExecutionMaxPerTxArray);
-        _setRequestGasLimit(_requestGasLimit);
+        _setRequestGasLimit(0x00000000, _requestGasLimit);
         _setOwner(_owner);
         _setTokenFactory(_tokenFactory);
 
@@ -111,8 +111,7 @@ contract ForeignOmnibridge is BasicOmnibridge {
         addTotalSpentPerDay(_token, getCurrentDay(), _value);
 
         bytes memory data = _prepareMessage(isKnownToken, isNativeToken, _token, _receiver, _value, decimals);
-        bytes32 _messageId =
-            bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), data, requestGasLimit());
+        bytes32 _messageId = _passMessage(data, true);
         _recordBridgeOperation(!isKnownToken, _messageId, _token, _from, _value);
     }
 
@@ -155,5 +154,25 @@ contract ForeignOmnibridge is BasicOmnibridge {
      */
     function _transformName(string memory _name) internal pure override returns (string memory) {
         return string(abi.encodePacked(_name, " on Mainnet"));
+    }
+
+    /**
+     * @dev Internal function for sending an AMB message to the mediator on the other side.
+     * @param _data data to be sent to the other side of the bridge.
+     * @param _useOracleLane always true, not used on this side of the bridge.
+     * @return id of the sent message.
+     */
+    function _passMessage(bytes memory _data, bool _useOracleLane) internal override returns (bytes32) {
+        (_useOracleLane);
+        bytes4 selector;
+        assembly {
+            selector := shl(mload(add(_data, 4)), 224)
+        }
+        uint256 gasLimit = requestGasLimit(selector);
+        if (gasLimit == 0) {
+            gasLimit = requestGasLimit(0x00000000);
+        }
+
+        return bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), _data, gasLimit);
     }
 }

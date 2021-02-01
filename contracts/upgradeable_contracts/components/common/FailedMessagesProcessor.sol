@@ -22,7 +22,7 @@ abstract contract FailedMessagesProcessor is BasicAMBMediator, BridgeOperationsS
 
         bytes4 methodSelector = this.fixFailedMessage.selector;
         bytes memory data = abi.encodeWithSelector(methodSelector, _messageId);
-        bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), data, requestGasLimit());
+        _passMessage(data, true);
     }
 
     /**
