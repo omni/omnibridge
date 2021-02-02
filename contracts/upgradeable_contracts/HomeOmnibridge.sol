@@ -3,13 +3,19 @@ pragma solidity 0.7.5;
 import "./BasicOmnibridge.sol";
 import "./HomeOmnibridgeFeeManager.sol";
 import "./modules/forwarding_rules/MultiTokenForwardingRulesConnector.sol";
+import "./components/common/SelectorTokenGasLimitManager.sol";
 
 /**
  * @title HomeOmnibridge
  * @dev Home side implementation for multi-token mediator intended to work on top of AMB bridge.
  * It is designed to be used as an implementation contract of EternalStorageProxy contract.
  */
-contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiTokenForwardingRulesConnector {
+contract HomeOmnibridge is
+    BasicOmnibridge,
+    SelectorTokenGasLimitManager,
+    HomeOmnibridgeFeeManager,
+    MultiTokenForwardingRulesConnector
+{
     using SafeMath for uint256;
     using SafeERC20 for IERC677;
 
@@ -45,7 +51,7 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
         _setMediatorContractOnOtherSide(_mediatorContract);
         _setLimits(address(0), _dailyLimitMaxPerTxMinPerTxArray);
         _setExecutionLimits(address(0), _executionDailyLimitExecutionMaxPerTxArray);
-        _setRequestGasLimit(0x00000000, _requestGasLimit);
+        _setRequestGasLimit(0x00000000, address(0), _requestGasLimit);
         _setOwner(_owner);
         _setTokenFactory(_tokenFactory);
         if (_rewardAddresses.length > 0) {
@@ -189,14 +195,7 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
      */
     function _passMessage(bytes memory _data, bool _useOracleLane) internal override returns (bytes32) {
         address executor = mediatorContractOnOtherSide();
-        bytes4 selector;
-        assembly {
-            selector := shl(mload(add(_data, 4)), 224)
-        }
-        uint256 gasLimit = requestGasLimit(selector);
-        if (gasLimit == 0) {
-            gasLimit = requestGasLimit(0x00000000);
-        }
+        uint256 gasLimit = _chooseRequestGasLimit(_data);
         IAMB bridge = bridgeContract();
 
         return
