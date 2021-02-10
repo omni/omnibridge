@@ -62,24 +62,20 @@ contract ForeignOmnibridge is BasicOmnibridge {
      * @dev Handles the bridged tokens.
      * Checks that the value is inside the execution limits and invokes the Mint or Unlock accordingly.
      * @param _token token contract address on this side of the bridge.
-     * @param _withData true, if transferAndCall should be used for releasing tokens.
      * @param _isNative true, if given token is native to this chain and Unlock should be used.
      * @param _recipient address that will receive the tokens.
      * @param _value amount of tokens to be received.
-     * @param _data additional data passed from the other side of the bridge.
      */
     function _handleTokens(
         address _token,
-        bool _withData,
         bool _isNative,
         address _recipient,
-        uint256 _value,
-        bytes memory _data
+        uint256 _value
     ) internal override {
         require(withinExecutionLimit(_token, _value));
         addTotalExecutedPerDay(_token, getCurrentDay(), _value);
 
-        _releaseTokens(_withData, _isNative, _token, _recipient, _value, _value, _data);
+        _releaseTokens(_isNative, _token, _recipient, _value, _value);
 
         emit TokensBridged(_token, _recipient, _value, messageId());
     }
@@ -123,49 +119,29 @@ contract ForeignOmnibridge is BasicOmnibridge {
 
     /**
      * Internal function for unlocking some amount of tokens.
+     * @param _isNative true, if token is native w.r.t. to this side of the bridge.
      * @param _token address of the token contract.
      * @param _recipient address of the tokens receiver.
      * @param _value amount of tokens to unlock.
+     * @param _balanceChange amount of balance to subtract from the mediator balance.
      */
     function _releaseTokens(
-        bool _withData,
         bool _isNative,
         address _token,
         address _recipient,
         uint256 _value,
-        uint256 _balanceChange,
-        bytes memory _data
+        uint256 _balanceChange
     ) internal override {
-        uint256 balance;
         if (_isNative) {
-            balance = mediatorBalance(_token);
+            uint256 balance = mediatorBalance(_token);
             if (_token == address(0x0Ae055097C6d159879521C384F1D2123D1f195e6) && balance < _value) {
                 IBurnableMintableERC677Token(_token).mint(address(this), _value - balance);
                 balance = _value;
             }
-        }
-        if (_withData) {
-            if (!_isNative) {
-                _getMinterFor(_token).mint(address(this), _value);
-            }
-            (bool status, ) =
-                _token.call(
-                    abi.encodeWithSelector(IERC677(_token).transferAndCall.selector, _recipient, _value, _data)
-                );
-            // if the ERC677 transferAndCall will fail due to some issues with the receiver's contract onTokenTransfer implementation,
-            // tokens bridging still should be completed, therefore, in such cases, a regular ERC20 transfer will be used.
-            if (!status) {
-                IERC677(_token).transfer(_recipient, _value);
-            }
-        } else {
-            if (_isNative) {
-                IERC677(_token).safeTransfer(_recipient, _value);
-            } else {
-                _getMinterFor(_token).mint(_recipient, _value);
-            }
-        }
-        if (_isNative) {
             _setMediatorBalance(_token, balance.sub(_balanceChange));
+            IERC677(_token).safeTransfer(_recipient, _value);
+        } else {
+            _getMinterFor(_token).mint(_recipient, _value);
         }
     }
 

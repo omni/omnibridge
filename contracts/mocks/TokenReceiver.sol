@@ -1,6 +1,8 @@
 pragma solidity 0.7.5;
 
-contract TokenReceiver {
+import "../interfaces/IERC20Receiver.sol";
+
+contract TokenReceiver is IERC20Receiver {
     address public token;
     address public from;
     uint256 public value;
@@ -10,9 +12,9 @@ contract TokenReceiver {
         address _from,
         uint256 _value,
         bytes memory _data
-    ) external {
-        token = msg.sender;
-        from = _from;
+    ) external override {
+        token = _from;
+        from = msg.sender;
         value = _value;
         data = _data;
     }

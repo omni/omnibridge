@@ -14,6 +14,7 @@ import "./components/common/FailedMessagesProcessor.sol";
 import "./modules/factory/TokenFactoryConnector.sol";
 import "../interfaces/IBurnableMintableERC677Token.sol";
 import "../interfaces/IERC20Metadata.sol";
+import "../interfaces/IERC20Receiver.sol";
 import "../libraries/TokenReader.sol";
 
 /**
@@ -56,7 +57,7 @@ abstract contract BasicOmnibridge is
     ) external onlyMediator {
         address bridgedToken = _getBridgedTokenOrDeploy(_token, _name, _symbol, _decimals);
 
-        _handleTokens(bridgedToken, false, false, _recipient, _value, new bytes(0));
+        _handleTokens(bridgedToken, false, _recipient, _value);
     }
 
     /**
@@ -82,7 +83,9 @@ abstract contract BasicOmnibridge is
     ) external onlyMediator {
         address bridgedToken = _getBridgedTokenOrDeploy(_token, _name, _symbol, _decimals);
 
-        _handleTokens(bridgedToken, true, false, _recipient, _value, _data);
+        _handleTokens(bridgedToken, false, _recipient, _value);
+
+        _receiverCallback(_recipient, bridgedToken, _value, _data);
     }
 
     /**
@@ -101,7 +104,7 @@ abstract contract BasicOmnibridge is
 
         require(isTokenRegistered(token));
 
-        _handleTokens(token, false, false, _recipient, _value, new bytes(0));
+        _handleTokens(token, false, _recipient, _value);
     }
 
     /**
@@ -123,7 +126,9 @@ abstract contract BasicOmnibridge is
 
         require(isTokenRegistered(token));
 
-        _handleTokens(token, true, false, _recipient, _value, _data);
+        _handleTokens(token, false, _recipient, _value);
+
+        _receiverCallback(_recipient, token, _value, _data);
     }
 
     /**
@@ -140,7 +145,7 @@ abstract contract BasicOmnibridge is
     ) external onlyMediator {
         require(isRegisteredAsNativeToken(_token));
 
-        _handleTokens(_token, false, true, _recipient, _value, new bytes(0));
+        _handleTokens(_token, true, _recipient, _value);
     }
 
     /**
@@ -160,7 +165,9 @@ abstract contract BasicOmnibridge is
     ) external onlyMediator {
         require(isRegisteredAsNativeToken(_token));
 
-        _handleTokens(_token, true, true, _recipient, _value, _data);
+        _handleTokens(_token, true, _recipient, _value);
+
+        _receiverCallback(_recipient, _token, _value, _data);
     }
 
     /**
@@ -185,7 +192,7 @@ abstract contract BasicOmnibridge is
             delete uintStorage[keccak256(abi.encodePacked("executionMaxPerTx", _token))];
             _setTokenRegistrationMessageId(_token, bytes32(0));
         }
-        _releaseTokens(false, registrationMessageId != bytes32(0), _token, _recipient, _value, _value, new bytes(0));
+        _releaseTokens(registrationMessageId != bytes32(0), _token, _recipient, _value, _value);
     }
 
     /**
@@ -361,45 +368,24 @@ abstract contract BasicOmnibridge is
 
     /**
      * Internal function for unlocking some amount of tokens.
-     * @param _withData true, if transferAndCall should be used for unlocking tokens.
      * @param _isNative true, if token is native w.r.t. to this side of the bridge.
      * @param _token address of the token contract.
      * @param _recipient address of the tokens receiver.
      * @param _value amount of tokens to unlock.
      * @param _balanceChange amount of balance to subtract from the mediator balance.
-     * @param _data additional data passed from the other side of the bridge.
      */
     function _releaseTokens(
-        bool _withData,
         bool _isNative,
         address _token,
         address _recipient,
         uint256 _value,
-        uint256 _balanceChange,
-        bytes memory _data
+        uint256 _balanceChange
     ) internal virtual {
-        if (_withData) {
-            if (!_isNative) {
-                _getMinterFor(_token).mint(address(this), _value);
-            }
-            (bool status, ) =
-                _token.call(
-                    abi.encodeWithSelector(IERC677(_token).transferAndCall.selector, _recipient, _value, _data)
-                );
-            // if the ERC677 transferAndCall will fail due to some issues with the receiver's contract onTokenTransfer implementation,
-            // tokens bridging still should be completed, therefore, in such cases, a regular ERC20 transfer will be used.
-            if (!status) {
-                IERC677(_token).transfer(_recipient, _value);
-            }
-        } else {
-            if (_isNative) {
-                IERC677(_token).safeTransfer(_recipient, _value);
-            } else {
-                _getMinterFor(_token).mint(_recipient, _value);
-            }
-        }
         if (_isNative) {
+            IERC677(_token).safeTransfer(_recipient, _value);
             _setMediatorBalance(_token, mediatorBalance(_token).sub(_balanceChange));
+        } else {
+            _getMinterFor(_token).mint(_recipient, _value);
         }
     }
 
@@ -437,13 +423,30 @@ abstract contract BasicOmnibridge is
         return bridgedToken;
     }
 
-    function _handleTokens(
-        address _token,
-        bool _withData,
-        bool _isNative,
+    /**
+     * Notifies receiving contract about the completed bridging operation.
+     * @param _recipient address of the tokens receiver.
+     * @param _token address of the bridged token.
+     * @param _value amount of tokens transferred.
+     * @param _data additional data passed to the callback.
+     */
+    function _receiverCallback(
         address _recipient,
+        address _token,
         uint256 _value,
         bytes memory _data
+    ) internal {
+        if (Address.isContract(_recipient)) {
+            bytes memory data = abi.encodeWithSelector(IERC20Receiver.onTokenTransfer.selector, _token, _value, _data);
+            _recipient.call(data);
+        }
+    }
+
+    function _handleTokens(
+        address _token,
+        bool _isNative,
+        address _recipient,
+        uint256 _value
     ) internal virtual;
 
     function _transformName(string memory _name) internal pure virtual returns (string memory);

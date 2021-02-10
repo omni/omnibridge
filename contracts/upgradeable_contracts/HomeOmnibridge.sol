@@ -94,19 +94,15 @@ contract HomeOmnibridge is BasicOmnibridge, OmnibridgeFeeManagerConnector, Multi
      * @dev Handles the bridged tokens.
      * Checks that the value is inside the execution limits and invokes the Mint or Unlock accordingly.
      * @param _token token contract address on this side of the bridge.
-     * @param _withData true, if transferAndCall should be used for releasing tokens.
      * @param _isNative true, if given token is native to this chain and Unlock should be used.
      * @param _recipient address that will receive the tokens.
      * @param _value amount of tokens to be received.
-     * @param _data additional data passed from the other side of the bridge.
      */
     function _handleTokens(
         address _token,
-        bool _withData,
         bool _isNative,
         address _recipient,
-        uint256 _value,
-        bytes memory _data
+        uint256 _value
     ) internal override {
         require(withinExecutionLimit(_token, _value));
         addTotalExecutedPerDay(_token, getCurrentDay(), _value);
@@ -119,7 +115,7 @@ contract HomeOmnibridge is BasicOmnibridge, OmnibridgeFeeManagerConnector, Multi
             valueToBridge = valueToBridge.sub(fee);
         }
 
-        _releaseTokens(_withData, _isNative, _token, _recipient, valueToBridge, _value, _data);
+        _releaseTokens(_isNative, _token, _recipient, valueToBridge, _value);
 
         emit TokensBridged(_token, _recipient, valueToBridge, _messageId);
     }
