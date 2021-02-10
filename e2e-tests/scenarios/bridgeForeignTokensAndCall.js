@@ -1,5 +1,5 @@
 const assert = require('assert')
-const { toWei } = require('../utils')
+const { toWei, ZERO_ADDRESS } = require('../utils')
 
 async function run({ foreign, home }) {
   console.log('Bridging Native Foreign token to Home chain')
@@ -14,7 +14,7 @@ async function run({ foreign, home }) {
   const relayTxHash1 = await home.waitUntilProcessed(receipt1)
   const bridgedToken = await home.getBridgedToken(token)
 
-  await home.checkTransfer(relayTxHash1, bridgedToken, home.mediator, tokenReceiver, home.reduceByForeignFee(value))
+  await home.checkTransfer(relayTxHash1, bridgedToken, ZERO_ADDRESS, tokenReceiver, home.reduceByForeignFee(value))
   assert.strictEqual(await tokenReceiver.methods.data().call(), '0x1122', 'Data was not passed correctly')
 
   console.log('Sending 5 tokens to the Home Mediator with extra data')
