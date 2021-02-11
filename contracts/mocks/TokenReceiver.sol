@@ -8,12 +8,12 @@ contract TokenReceiver is IERC20Receiver {
     uint256 public value;
     bytes public data;
 
-    function onTokenTransfer(
-        address _from,
+    function onTokenBridged(
+        address _token,
         uint256 _value,
         bytes memory _data
     ) external override {
-        token = _from;
+        token = _token;
         from = msg.sender;
         value = _value;
         data = _data;

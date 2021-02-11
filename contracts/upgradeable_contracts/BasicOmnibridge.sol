@@ -437,8 +437,7 @@ abstract contract BasicOmnibridge is
         bytes memory _data
     ) internal {
         if (Address.isContract(_recipient)) {
-            bytes memory data = abi.encodeWithSelector(IERC20Receiver.onTokenTransfer.selector, _token, _value, _data);
-            _recipient.call(data);
+            _recipient.call(abi.encodeWithSelector(IERC20Receiver.onTokenBridged.selector, _token, _value, _data));
         }
     }
 
