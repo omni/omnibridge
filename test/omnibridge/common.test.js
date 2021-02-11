@@ -188,6 +188,23 @@ function runTests(accounts, isHome) {
       await contract.claimTokens(token.address, accounts[3], { from: user }).should.be.rejected
       await contract.claimTokens(token.address, accounts[3], { from: owner }).should.be.rejected
     })
+
+    it('should allow owner to claim tokens from token contract', async () => {
+      const args = [otherSideToken1, 'Test', 'TST', 18, user, value]
+      const data = contract.contract.methods.deployAndHandleBridgedTokens(...args).encodeABI()
+      expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
+      const bridgedToken = await contract.bridgedTokenAddress(otherSideToken1)
+
+      await token.mint(user, 1).should.be.fulfilled
+      await token.transfer(bridgedToken, 1, { from: user }).should.be.fulfilled
+
+      await contract.claimTokensFromTokenContract(bridgedToken, token.address, accounts[3], { from: user }).should.be
+        .rejected
+      await contract.claimTokensFromTokenContract(bridgedToken, token.address, accounts[3], { from: owner }).should.be
+        .fulfilled
+
+      expect(await token.balanceOf(accounts[3])).to.be.bignumber.equal('1')
+    })
   })
 
   describe('initialize', () => {
