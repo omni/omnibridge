@@ -201,6 +201,21 @@ abstract contract BasicOmnibridge is
     }
 
     /**
+     * @dev Withdraws erc20 tokens or native coins from the bridged token contract.
+     * Only the proxy owner is allowed to call this method.
+     * @param _bridgedToken address of the bridged token contract.
+     * @param _token address of the claimed token or address(0) for native coins.
+     * @param _to address of the tokens/coins receiver.
+     */
+    function claimTokensFromTokenContract(
+        address _bridgedToken,
+        address _token,
+        address _to
+    ) external onlyIfUpgradeabilityOwner {
+        IBurnableMintableERC677Token(_bridgedToken).claimTokens(_token, _to);
+    }
+
+    /**
      * @dev Internal function for recording bridge operation for further usage.
      * Recorded information is used for fixing failed requests on the other side.
      * @param _register true, if native token is bridged for the first time.
