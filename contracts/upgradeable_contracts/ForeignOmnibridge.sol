@@ -1,14 +1,14 @@
 pragma solidity 0.7.5;
 
 import "./BasicOmnibridge.sol";
-import "./components/common/SelectorGasLimitManager.sol";
+import "./components/common/GasLimitManager.sol";
 
 /**
  * @title ForeignOmnibridge
  * @dev Foreign side implementation for multi-token mediator intended to work on top of AMB bridge.
  * It is designed to be used as an implementation contract of EternalStorageProxy contract.
  */
-contract ForeignOmnibridge is BasicOmnibridge, SelectorGasLimitManager {
+contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager {
     using SafeERC20 for IERC677;
     using SafeMath for uint256;
 
@@ -39,7 +39,7 @@ contract ForeignOmnibridge is BasicOmnibridge, SelectorGasLimitManager {
         _setMediatorContractOnOtherSide(_mediatorContract);
         _setLimits(address(0), _dailyLimitMaxPerTxMinPerTxArray);
         _setExecutionLimits(address(0), _executionDailyLimitExecutionMaxPerTxArray);
-        _setRequestGasLimit(0x00000000, _requestGasLimit);
+        _setRequestGasLimit(_requestGasLimit);
         _setOwner(_owner);
         _setTokenFactory(_tokenFactory);
 

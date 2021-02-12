@@ -55,6 +55,9 @@ abstract contract SelectorGasLimitManager is BasicAMBMediator {
     function _chooseRequestGasLimit(bytes memory _data) internal view override returns (uint256) {
         bytes4 selector;
         assembly {
+            // first 4 bytes of _data contain the selector of the function to be called on the other side of the bridge.
+            // mload(add(_data, 4)) loads selector to the 28-31 bytes of the word.
+            // shl(28 * 8, x) then used to correct the padding of the selector, putting it to 0-3 bytes of the word.
             selector := shl(224, mload(add(_data, 4)))
         }
         uint256 gasLimit = requestGasLimit(selector);
@@ -68,6 +71,11 @@ abstract contract SelectorGasLimitManager is BasicAMBMediator {
      */
     function _setRequestGasLimit(bytes4 _selector, uint256 _gasLimit) internal {
         require(_gasLimit <= maxGasPerTx());
+        // xor-based hashing here is used for determining the mapping key, such approach allows to save small amount of gas
+        // and allows seamless migration between the gas limit managers,
+        // since both GasLimitManager.setRequestGasLimit(uint256) and SelectorGasLimitManager.setRequestGasLimit(uint256) use the same mapping slot.
+        // It is safe-enough to use xor-based hashing here, since the mapping key cannot be altered at 4..31 bytes.
+        // (_selector can have non-zero bytes only at 0..3 positions).
         uintStorage[REQUEST_GAS_LIMIT ^ _selector] = _gasLimit;
     }
 }

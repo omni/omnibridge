@@ -83,7 +83,13 @@ abstract contract SelectorTokenGasLimitManager is BasicAMBMediator {
         bytes4 selector;
         address token;
         assembly {
+            // first 4 bytes of _data contain the selector of the function to be called on the other side of the bridge.
+            // mload(add(_data, 4)) loads selector to the 28-31 bytes of the word.
+            // shl(28 * 8, x) then used to correct the padding of the selector, putting it to 0-3 bytes of the word.
             selector := shl(224, mload(add(_data, 4)))
+            // handleBridgedTokens/handleNativeTokens/... passes bridged token address as the first parameter.
+            // it is located in the 4-35 bytes of the calldata.
+            // 36 = bytes length padding (32) + selector length (4)
             token := mload(add(_data, 36))
         }
         uint256 gasLimit = requestGasLimit(selector, token);
@@ -108,6 +114,11 @@ abstract contract SelectorTokenGasLimitManager is BasicAMBMediator {
         uint256 _gasLimit
     ) internal {
         require(_gasLimit <= maxGasPerTx());
+        // xor-based hashing here is used for determining the mapping key, such approach allows to save small amount of gas
+        // and allows seamless migration between the gas limit managers,
+        // since both GasLimitManager.setRequestGasLimit(uint256) and SelectorTokenGasLimitManager.setRequestGasLimit(uint256) use the same mapping slot.
+        // It is safe-enough to use xor-based hashing here, since the mapping key cannot be altered at 4..11 bytes.
+        // (_selector can have non-zero bytes only at 0..3 positions, _token can non-zero bytes only at 12..31 positions).
         uintStorage[REQUEST_GAS_LIMIT ^ _selector ^ bytes32(uint256(_token))] = _gasLimit;
     }
 }

@@ -398,20 +398,19 @@ function runTests(accounts, isHome) {
       })
 
       describe('request gas limit', () => {
-        it('should allow to set request gas limit for specific selector', async () => {
-          const method = contract.methods['setRequestGasLimit(bytes4,uint256)']
-          await method('0xffffffff', 200000, { from: user }).should.be.rejected
-          await method('0xffffffff', 200000, { from: owner }).should.be.fulfilled
+        it('should allow to set default gas limit', async () => {
+          const method = contract.methods['setRequestGasLimit(uint256)']
+          await method(200000, { from: user }).should.be.rejected
+          await method(200000, { from: owner }).should.be.fulfilled
 
-          expect(await contract.methods['requestGasLimit(bytes4)']('0xffffffff')).to.be.bignumber.equal('200000')
-          expect(await contract.methods['requestGasLimit()']()).to.be.bignumber.equal('1000000')
+          expect(await contract.methods['requestGasLimit()']()).to.be.bignumber.equal('200000')
         })
 
         it('should use the custom gas limit when bridging tokens', async () => {
           await sendFunctions[0](ether('0.01')).should.be.fulfilled
           await sendFunctions[0](ether('0.01')).should.be.fulfilled
 
-          await contract.methods['setRequestGasLimit(bytes4,uint256)']('0x125e4cfb', 200000).should.be.fulfilled
+          await contract.methods['setRequestGasLimit(uint256)'](200000).should.be.fulfilled
 
           await sendFunctions[0](ether('0.01')).should.be.fulfilled
 
@@ -423,6 +422,30 @@ function runTests(accounts, isHome) {
         })
 
         if (isHome) {
+          it('should allow to set request gas limit for specific selector', async () => {
+            const method = contract.methods['setRequestGasLimit(bytes4,uint256)']
+            await method('0xffffffff', 200000, { from: user }).should.be.rejected
+            await method('0xffffffff', 200000, { from: owner }).should.be.fulfilled
+
+            expect(await contract.methods['requestGasLimit(bytes4)']('0xffffffff')).to.be.bignumber.equal('200000')
+            expect(await contract.methods['requestGasLimit()']()).to.be.bignumber.equal('1000000')
+          })
+
+          it('should use the custom gas limit when bridging tokens', async () => {
+            await sendFunctions[0](ether('0.01')).should.be.fulfilled
+            await sendFunctions[0](ether('0.01')).should.be.fulfilled
+
+            await contract.methods['setRequestGasLimit(bytes4,uint256)']('0x125e4cfb', 200000).should.be.fulfilled
+
+            await sendFunctions[0](ether('0.01')).should.be.fulfilled
+
+            const events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
+            expect(events.length).to.be.equal(3)
+            expect(events[0].returnValues.gas).to.be.equal('1000000')
+            expect(events[1].returnValues.gas).to.be.equal('1000000')
+            expect(events[2].returnValues.gas).to.be.equal('200000')
+          })
+
           it('should allow to set request gas limit for specific selector and token', async () => {
             const method = contract.methods['setRequestGasLimit(bytes4,address,uint256)']
             await method('0xffffffff', token.address, 200000, { from: user }).should.be.rejected
