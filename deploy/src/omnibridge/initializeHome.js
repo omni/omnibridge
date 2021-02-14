@@ -19,90 +19,48 @@ const {
   HOME_MEDIATOR_REWARD_ACCOUNTS,
 } = require('../loadEnv')
 
-async function initializeMediator({
-  contract,
-  params: {
-    bridgeContract,
-    mediatorContract,
-    dailyLimit,
-    maxPerTx,
-    minPerTx,
-    executionDailyLimit,
-    executionMaxPerTx,
-    requestGasLimit,
-    owner,
-    tokenFactory,
-    rewardAddressList,
-    homeToForeignFee,
-    foreignToHomeFee,
-  },
-}) {
+async function initialize({ homeBridge, foreignBridge, tokenFactory }) {
+  let nonce = await web3Home.eth.getTransactionCount(deploymentAddress)
+  const contract = new web3Home.eth.Contract(HomeOmnibridge.abi, homeBridge)
+
+  console.log('\n[Home] Initializing Bridge Mediator with following parameters:')
+  const isRewardable = HOME_REWARDABLE === 'BOTH_DIRECTIONS'
+  const homeFee = isRewardable ? HOME_TRANSACTIONS_FEE : '0'
+  const foreignFee = isRewardable ? FOREIGN_TRANSACTIONS_FEE : '0'
+
   console.log(`
-    AMB contract: ${bridgeContract},
-    Mediator contract: ${mediatorContract},
-    DAILY_LIMIT : ${dailyLimit} which is ${fromWei(dailyLimit)} in eth,
-    MAX_AMOUNT_PER_TX: ${maxPerTx} which is ${fromWei(maxPerTx)} in eth,
-    MIN_AMOUNT_PER_TX: ${minPerTx} which is ${fromWei(minPerTx)} in eth,
-    EXECUTION_DAILY_LIMIT : ${executionDailyLimit} which is ${fromWei(executionDailyLimit)} in eth,
-    EXECUTION_MAX_AMOUNT_PER_TX: ${executionMaxPerTx} which is ${fromWei(executionMaxPerTx)} in eth,
-    MEDIATOR_REQUEST_GAS_LIMIT : ${requestGasLimit},
-    OWNER: ${owner},
+    AMB contract: ${HOME_AMB_BRIDGE},
+    Mediator contract: ${foreignBridge},
+    DAILY_LIMIT: ${HOME_DAILY_LIMIT} which is ${fromWei(HOME_DAILY_LIMIT)} in eth,
+    MAX_AMOUNT_PER_TX: ${HOME_MAX_AMOUNT_PER_TX} which is ${fromWei(HOME_MAX_AMOUNT_PER_TX)} in eth,
+    MIN_AMOUNT_PER_TX: ${HOME_MIN_AMOUNT_PER_TX} which is ${fromWei(HOME_MIN_AMOUNT_PER_TX)} in eth,
+    EXECUTION_DAILY_LIMIT : ${FOREIGN_DAILY_LIMIT} which is ${fromWei(FOREIGN_DAILY_LIMIT)} in eth,
+    EXECUTION_MAX_AMOUNT_PER_TX: ${FOREIGN_MAX_AMOUNT_PER_TX} which is ${fromWei(FOREIGN_MAX_AMOUNT_PER_TX)} in eth,
+    MEDIATOR_REQUEST_GAS_LIMIT: ${HOME_MEDIATOR_REQUEST_GAS_LIMIT},
+    OWNER: ${HOME_BRIDGE_OWNER},
     TOKEN_FACTORY: ${tokenFactory},
-    REWARD_ADDRESS_LIST: [${rewardAddressList.join(', ')}]
+    REWARD_ADDRESS_LIST: [${HOME_MEDIATOR_REWARD_ACCOUNTS.join(', ')}]
   `)
   if (HOME_REWARDABLE === 'BOTH_DIRECTIONS') {
     console.log(`
-    HOME_TO_FOREIGN_FEE: ${homeToForeignFee} which is ${HOME_TRANSACTIONS_FEE * 100}%
-    FOREIGN_TO_HOME_FEE: ${foreignToHomeFee} which is ${FOREIGN_TRANSACTIONS_FEE * 100}%
+    HOME_TO_FOREIGN_FEE: ${toWei(homeFee)} which is ${homeFee * 100}%
+    FOREIGN_TO_HOME_FEE: ${toWei(foreignFee)} which is ${foreignFee * 100}%
     `)
   }
 
-  return contract.methods
+  const initializeMediatorData = contract.methods
     .initialize(
-      bridgeContract,
-      mediatorContract,
-      [dailyLimit.toString(), maxPerTx.toString(), minPerTx.toString()],
-      [executionDailyLimit.toString(), executionMaxPerTx.toString()],
-      requestGasLimit.toString(),
-      owner,
+      HOME_AMB_BRIDGE,
+      foreignBridge,
+      [HOME_DAILY_LIMIT, HOME_MAX_AMOUNT_PER_TX, HOME_MIN_AMOUNT_PER_TX],
+      [FOREIGN_DAILY_LIMIT, FOREIGN_MAX_AMOUNT_PER_TX],
+      HOME_MEDIATOR_REQUEST_GAS_LIMIT,
+      HOME_BRIDGE_OWNER,
       tokenFactory,
-      rewardAddressList,
-      [homeToForeignFee.toString(), foreignToHomeFee.toString()]
+      HOME_MEDIATOR_REWARD_ACCOUNTS,
+      [toWei(homeFee), toWei(foreignFee)]
     )
     .encodeABI()
-}
-
-async function initialize({ homeBridge, foreignBridge, tokenFactory }) {
-  let nonce = await web3Home.eth.getTransactionCount(deploymentAddress)
-  const mediatorContract = new web3Home.eth.Contract(HomeOmnibridge.abi, homeBridge)
-
-  console.log('\n[Home] Initializing Bridge Mediator with following parameters:')
-  let homeFeeInWei = '0'
-  let foreignFeeInWei = '0'
-  if (HOME_REWARDABLE === 'BOTH_DIRECTIONS') {
-    homeFeeInWei = toWei(HOME_TRANSACTIONS_FEE.toString(), 'ether')
-    foreignFeeInWei = toWei(FOREIGN_TRANSACTIONS_FEE.toString(), 'ether')
-  }
-  const rewardList = HOME_MEDIATOR_REWARD_ACCOUNTS.split(' ')
-
-  const initializeMediatorData = await initializeMediator({
-    contract: mediatorContract,
-    params: {
-      bridgeContract: HOME_AMB_BRIDGE,
-      mediatorContract: foreignBridge,
-      requestGasLimit: HOME_MEDIATOR_REQUEST_GAS_LIMIT,
-      owner: HOME_BRIDGE_OWNER,
-      dailyLimit: HOME_DAILY_LIMIT,
-      maxPerTx: HOME_MAX_AMOUNT_PER_TX,
-      minPerTx: HOME_MIN_AMOUNT_PER_TX,
-      executionDailyLimit: FOREIGN_DAILY_LIMIT,
-      executionMaxPerTx: FOREIGN_MAX_AMOUNT_PER_TX,
-      tokenFactory,
-      rewardAddressList: rewardList,
-      homeToForeignFee: homeFeeInWei,
-      foreignToHomeFee: foreignFeeInWei,
-    },
-  })
 
   await sendRawTxHome({
     data: initializeMediatorData,
@@ -111,9 +69,9 @@ async function initialize({ homeBridge, foreignBridge, tokenFactory }) {
   })
 
   console.log('\n[Home] Transferring bridge mediator proxy ownership to upgradeability admin')
-  const mediatorProxy = new web3Home.eth.Contract(EternalStorageProxy.abi, homeBridge)
+  const proxy = new web3Home.eth.Contract(EternalStorageProxy.abi, homeBridge)
   await transferProxyOwnership({
-    proxy: mediatorProxy,
+    proxy,
     newOwner: HOME_UPGRADEABLE_ADMIN,
     nonce: nonce++,
   })

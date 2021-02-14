@@ -1,6 +1,4 @@
 /* eslint-disable no-param-reassign */
-const BigNumber = require('bignumber.js')
-const Web3Utils = require('web3').utils
 const assert = require('assert')
 const {
   web3Home,
@@ -78,33 +76,23 @@ async function sendRawTxForeign(options) {
 
 async function sendRawTx({ data, nonce, to, web3, gasPrice, value }) {
   try {
-    const estimatedGas = new BigNumber(
-      await web3.eth.estimateGas({
-        from: deploymentAddress,
-        value,
-        to,
-        data,
-      })
-    )
+    const estimatedGas = await web3.eth.estimateGas({
+      from: deploymentAddress,
+      value,
+      to,
+      data,
+    })
 
     const blockData = await web3.eth.getBlock('latest')
-    const blockGasLimit = new BigNumber(blockData.gasLimit)
-    if (estimatedGas.isGreaterThan(blockGasLimit)) {
-      throw new Error(
-        `estimated gas greater (${estimatedGas.toString()}) than the block gas limit (${blockGasLimit.toString()})`
-      )
-    }
-    let gas = estimatedGas.multipliedBy(new BigNumber(1 + GAS_LIMIT_EXTRA))
-    if (gas.isGreaterThan(blockGasLimit)) {
-      gas = blockGasLimit
-    } else {
-      gas = gas.toFixed(0)
+    const blockGasLimit = blockData.gasLimit
+    if (estimatedGas > blockGasLimit) {
+      throw new Error(`estimated gas greater (${estimatedGas}) than the block gas limit (${blockGasLimit})`)
     }
 
     const rawTx = {
       nonce,
-      gasPrice: Web3Utils.toHex(gasPrice),
-      gasLimit: Web3Utils.toHex(gas),
+      gasPrice,
+      gasLimit: Math.min(Math.ceil(estimatedGas * (1 + parseFloat(GAS_LIMIT_EXTRA))), blockGasLimit),
       to,
       data,
       value,

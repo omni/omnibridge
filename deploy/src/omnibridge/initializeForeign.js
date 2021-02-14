@@ -15,67 +15,35 @@ const {
   FOREIGN_MEDIATOR_REQUEST_GAS_LIMIT,
 } = require('../loadEnv')
 
-async function initializeMediator({
-  contract,
-  params: {
-    bridgeContract,
-    mediatorContract,
-    dailyLimit,
-    maxPerTx,
-    minPerTx,
-    executionDailyLimit,
-    executionMaxPerTx,
-    requestGasLimit,
-    owner,
-    tokenFactory,
-  },
-}) {
-  console.log(`
-    AMB contract: ${bridgeContract},
-    Mediator contract: ${mediatorContract},
-    DAILY_LIMIT : ${dailyLimit} which is ${fromWei(dailyLimit)} in eth,
-    MAX_AMOUNT_PER_TX: ${maxPerTx} which is ${fromWei(maxPerTx)} in eth,
-    MIN_AMOUNT_PER_TX: ${minPerTx} which is ${fromWei(minPerTx)} in eth,
-    EXECUTION_DAILY_LIMIT : ${executionDailyLimit} which is ${fromWei(executionDailyLimit)} in eth,
-    EXECUTION_MAX_AMOUNT_PER_TX: ${executionMaxPerTx} which is ${fromWei(executionMaxPerTx)} in eth,
-    MEDIATOR_REQUEST_GAS_LIMIT : ${requestGasLimit},
-    OWNER: ${owner},
-    TOKEN_FACTORY: ${tokenFactory}`)
-
-  return contract.methods
-    .initialize(
-      bridgeContract,
-      mediatorContract,
-      [dailyLimit.toString(), maxPerTx.toString(), minPerTx.toString()],
-      [executionDailyLimit.toString(), executionMaxPerTx.toString()],
-      requestGasLimit.toString(),
-      owner,
-      tokenFactory
-    )
-    .encodeABI()
-}
-
 async function initialize({ homeBridge, foreignBridge, tokenFactory }) {
   let nonce = await web3Foreign.eth.getTransactionCount(deploymentAddress)
   const contract = new web3Foreign.eth.Contract(ForeignOmnibridge.abi, foreignBridge)
 
   console.log('\n[Foreign] Initializing Bridge Mediator with following parameters:')
 
-  const initializeData = await initializeMediator({
-    contract,
-    params: {
-      bridgeContract: FOREIGN_AMB_BRIDGE,
-      mediatorContract: homeBridge,
-      requestGasLimit: FOREIGN_MEDIATOR_REQUEST_GAS_LIMIT,
-      owner: FOREIGN_BRIDGE_OWNER,
-      dailyLimit: FOREIGN_DAILY_LIMIT,
-      maxPerTx: FOREIGN_MAX_AMOUNT_PER_TX,
-      minPerTx: FOREIGN_MIN_AMOUNT_PER_TX,
-      executionDailyLimit: HOME_DAILY_LIMIT,
-      executionMaxPerTx: HOME_MAX_AMOUNT_PER_TX,
-      tokenFactory,
-    },
-  })
+  console.log(`
+    AMB contract: ${FOREIGN_AMB_BRIDGE},
+    Mediator contract: ${homeBridge},
+    DAILY_LIMIT: ${FOREIGN_DAILY_LIMIT} which is ${fromWei(FOREIGN_DAILY_LIMIT)} in eth,
+    MAX_AMOUNT_PER_TX: ${FOREIGN_MAX_AMOUNT_PER_TX} which is ${fromWei(FOREIGN_MAX_AMOUNT_PER_TX)} in eth,
+    MIN_AMOUNT_PER_TX: ${FOREIGN_MIN_AMOUNT_PER_TX} which is ${fromWei(FOREIGN_MIN_AMOUNT_PER_TX)} in eth,
+    EXECUTION_DAILY_LIMIT : ${HOME_DAILY_LIMIT} which is ${fromWei(HOME_DAILY_LIMIT)} in eth,
+    EXECUTION_MAX_AMOUNT_PER_TX: ${HOME_MAX_AMOUNT_PER_TX} which is ${fromWei(HOME_MAX_AMOUNT_PER_TX)} in eth,
+    MEDIATOR_REQUEST_GAS_LIMIT : ${FOREIGN_MEDIATOR_REQUEST_GAS_LIMIT},
+    OWNER: ${FOREIGN_BRIDGE_OWNER},
+    TOKEN_FACTORY: ${tokenFactory}`)
+
+  const initializeData = contract.methods
+    .initialize(
+      FOREIGN_AMB_BRIDGE,
+      homeBridge,
+      [FOREIGN_DAILY_LIMIT, FOREIGN_MAX_AMOUNT_PER_TX, FOREIGN_MIN_AMOUNT_PER_TX],
+      [HOME_DAILY_LIMIT, HOME_MAX_AMOUNT_PER_TX],
+      FOREIGN_MEDIATOR_REQUEST_GAS_LIMIT,
+      FOREIGN_BRIDGE_OWNER,
+      tokenFactory
+    )
+    .encodeABI()
 
   await sendRawTxForeign({
     data: initializeData,
