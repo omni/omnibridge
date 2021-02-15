@@ -28,7 +28,7 @@ contract Ownable is EternalStorage {
     /**
      * @dev Internal function for reducing onlyOwner modifier bytecode overhead.
      */
-    function _onlyOwner() internal {
+    function _onlyOwner() internal view {
         require(msg.sender == owner());
     }
 

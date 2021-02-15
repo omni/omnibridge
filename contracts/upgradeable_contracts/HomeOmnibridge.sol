@@ -205,7 +205,7 @@ contract HomeOmnibridge is
      */
     function _getMinterFor(address _token)
         internal
-        view
+        pure
         override(BasicOmnibridge, OmnibridgeFeeManagerConnector)
         returns (IBurnableMintableERC677Token)
     {
