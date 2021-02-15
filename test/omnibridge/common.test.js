@@ -25,6 +25,15 @@ const executionMaxPerTx = maxPerTx
 const exampleMessageId = '0xf308b922ab9f8a7128d9d7bc9bce22cd88b2c05c8213f0e2d8104d78e0a9ecbb'
 const otherMessageId = '0x35d3818e50234655f6aebb2a1cfbf30f59568d8a4ec72066fac5a25dbe7b8121'
 const failedMessageId = '0x2ebc2ccc755acc8eaf9252e19573af708d644ab63a39619adb080a3500a4ff2e'
+const selectors = {
+  deployAndHandleBridgedTokens: '0x2ae87cdd',
+  deployAndHandleBridgedTokensAndCall: '0xd522cfd7',
+  handleBridgedTokens: '0x125e4cfb',
+  handleBridgedTokensAndCall: '0xc5345761',
+  handleNativeTokens: '0x272255bb',
+  handleNativeTokensAndCall: '0x867f7a4d',
+  fixFailedMessage: '0x0950d515',
+}
 
 function runTests(accounts, isHome) {
   const Mediator = isHome ? HomeOmnibridge : ForeignOmnibridge
@@ -436,7 +445,8 @@ function runTests(accounts, isHome) {
             await sendFunctions[0](ether('0.01')).should.be.fulfilled
             await sendFunctions[0](ether('0.01')).should.be.fulfilled
 
-            await manager.methods['setRequestGasLimit(bytes4,uint256)']('0x125e4cfb', 200000).should.be.fulfilled
+            const method = manager.methods['setRequestGasLimit(bytes4,uint256)']
+            await method(selectors.handleBridgedTokens, 200000).should.be.fulfilled
 
             await sendFunctions[0](ether('0.01')).should.be.fulfilled
 
@@ -464,13 +474,14 @@ function runTests(accounts, isHome) {
           it('should use the custom gas limit when bridging specific token', async () => {
             await contract.setGasLimitManager(manager.address).should.be.fulfilled
 
-            await manager.methods['setRequestGasLimit(bytes4,uint256)']('0x125e4cfb', 100000).should.be.fulfilled
+            const method1 = manager.methods['setRequestGasLimit(bytes4,uint256)']
+            await method1(selectors.handleBridgedTokens, 100000).should.be.fulfilled
 
             await sendFunctions[0](ether('0.01')).should.be.fulfilled
             await sendFunctions[0](ether('0.01')).should.be.fulfilled
 
-            await manager.methods['setRequestGasLimit(bytes4,address,uint256)']('0x125e4cfb', token.address, 200000)
-              .should.be.fulfilled
+            const method2 = manager.methods['setRequestGasLimit(bytes4,address,uint256)']
+            await method2(selectors.handleBridgedTokens, token.address, 200000).should.be.fulfilled
 
             await sendFunctions[0](ether('0.01')).should.be.fulfilled
 
@@ -479,6 +490,54 @@ function runTests(accounts, isHome) {
             expect(events[0].returnValues.gas).to.be.equal('1000000')
             expect(events[1].returnValues.gas).to.be.equal('100000')
             expect(events[2].returnValues.gas).to.be.equal('200000')
+          })
+
+          describe('common gas limits setters', () => {
+            const token = otherSideToken1
+
+            it('should use setCommonRequestGasLimits', async () => {
+              const { setCommonRequestGasLimits } = manager
+              await setCommonRequestGasLimits([100, 200, 50, 100, 50, 100, 99], { from: user }).should.be.rejected
+              await setCommonRequestGasLimits([200, 100, 50, 100, 50, 100, 99], { from: owner }).should.be.rejected
+              await setCommonRequestGasLimits([100, 200, 100, 50, 50, 100, 99], { from: owner }).should.be.rejected
+              await setCommonRequestGasLimits([100, 200, 50, 100, 100, 50, 99], { from: owner }).should.be.rejected
+              await setCommonRequestGasLimits([10, 20, 50, 100, 50, 100, 99], { from: owner }).should.be.rejected
+              await setCommonRequestGasLimits([100, 200, 50, 100, 50, 100, 99], { from: owner }).should.be.fulfilled
+
+              const method = manager.methods['requestGasLimit(bytes4)']
+              expect(await method(selectors.deployAndHandleBridgedTokens)).to.be.bignumber.equal('100')
+              expect(await method(selectors.deployAndHandleBridgedTokensAndCall)).to.be.bignumber.equal('200')
+              expect(await method(selectors.handleBridgedTokens)).to.be.bignumber.equal('50')
+              expect(await method(selectors.handleBridgedTokensAndCall)).to.be.bignumber.equal('100')
+              expect(await method(selectors.handleNativeTokens)).to.be.bignumber.equal('50')
+              expect(await method(selectors.handleNativeTokensAndCall)).to.be.bignumber.equal('100')
+              expect(await method(selectors.fixFailedMessage)).to.be.bignumber.equal('99')
+            })
+
+            it('should use setBridgedTokenRequestGasLimits', async () => {
+              await manager.setBridgedTokenRequestGasLimits(token, [100, 200], { from: user }).should.be.rejected
+              await manager.setBridgedTokenRequestGasLimits(token, [200, 100], { from: owner }).should.be.rejected
+              await manager.setBridgedTokenRequestGasLimits(token, [100, 200], { from: owner }).should.be.fulfilled
+
+              const method = manager.methods['requestGasLimit(bytes4,address)']
+              expect(await method(selectors.handleNativeTokens, token)).to.be.bignumber.equal('100')
+              expect(await method(selectors.handleNativeTokensAndCall, token)).to.be.bignumber.equal('200')
+            })
+
+            it('should use setNativeTokenRequestGasLimits', async () => {
+              const { setNativeTokenRequestGasLimits } = manager
+              await setNativeTokenRequestGasLimits(token, [100, 200, 50, 100], { from: user }).should.be.rejected
+              await setNativeTokenRequestGasLimits(token, [200, 100, 50, 100], { from: owner }).should.be.rejected
+              await setNativeTokenRequestGasLimits(token, [100, 200, 100, 50], { from: owner }).should.be.rejected
+              await setNativeTokenRequestGasLimits(token, [10, 20, 50, 100], { from: owner }).should.be.rejected
+              await setNativeTokenRequestGasLimits(token, [100, 200, 50, 100], { from: owner }).should.be.fulfilled
+
+              const method = manager.methods['requestGasLimit(bytes4,address)']
+              expect(await method(selectors.deployAndHandleBridgedTokens, token)).to.be.bignumber.equal('100')
+              expect(await method(selectors.deployAndHandleBridgedTokensAndCall, token)).to.be.bignumber.equal('200')
+              expect(await method(selectors.handleBridgedTokens, token)).to.be.bignumber.equal('50')
+              expect(await method(selectors.handleBridgedTokensAndCall, token)).to.be.bignumber.equal('100')
+            })
           })
         })
       } else {
@@ -588,14 +647,14 @@ function runTests(accounts, isHome) {
             expect(executor).to.be.equal(otherSideMediator)
             let args
             if (receiver === tokenReceiver.address) {
-              expect(data.slice(2, 10)).to.be.equal('d522cfd7') // deployAndHandleBridgedTokensAndCall
+              expect(data.slice(0, 10)).to.be.equal(selectors.deployAndHandleBridgedTokensAndCall)
               args = web3.eth.abi.decodeParameters(
                 ['address', 'string', 'string', 'uint8', 'address', 'uint256', 'bytes'],
                 data.slice(10)
               )
               expect(args[6]).to.be.equal('0x1122')
             } else {
-              expect(data.slice(2, 10)).to.be.equal('2ae87cdd') // deployAndHandleBridgedTokens
+              expect(data.slice(0, 10)).to.be.equal(selectors.deployAndHandleBridgedTokens)
               args = web3.eth.abi.decodeParameters(
                 ['address', 'string', 'string', 'uint8', 'address', 'uint256'],
                 data.slice(10)
@@ -617,11 +676,11 @@ function runTests(accounts, isHome) {
             const { data: data2, dataType: dataType2 } = events[1].returnValues
             let args2
             if (receiver === tokenReceiver.address) {
-              expect(data2.slice(2, 10)).to.be.equal('c5345761') // handleBridgedTokensAndCall
+              expect(data2.slice(0, 10)).to.be.equal(selectors.handleBridgedTokensAndCall)
               args2 = web3.eth.abi.decodeParameters(['address', 'address', 'uint256', 'bytes'], data2.slice(10))
               expect(args2[3]).to.be.equal('0x1122')
             } else {
-              expect(data2.slice(2, 10)).to.be.equal('125e4cfb') // handleBridgedTokens
+              expect(data2.slice(0, 10)).to.be.equal(selectors.handleBridgedTokens)
               args2 = web3.eth.abi.decodeParameters(['address', 'address', 'uint256'], data2.slice(10))
             }
             expect(args2[0]).to.be.equal(token.address)
@@ -664,7 +723,7 @@ function runTests(accounts, isHome) {
           events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
           expect(events.length).to.be.equal(2)
           const { data, dataType } = events[1].returnValues
-          expect(data.slice(2, 10)).to.be.equal('c5345761')
+          expect(data.slice(0, 10)).to.be.equal(selectors.handleBridgedTokensAndCall)
           const args = web3.eth.abi.decodeParameters(['address', 'address', 'uint256', 'bytes'], data.slice(10))
           expect(args[0]).to.be.equal(token.address)
           expect(args[1]).to.be.equal(otherSideToken1)
@@ -788,7 +847,7 @@ function runTests(accounts, isHome) {
             const events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
             expect(events.length).to.be.equal(2)
             const { data, dataType, executor } = events[1].returnValues
-            expect(data.slice(2, 10)).to.be.equal('125e4cfb')
+            expect(data.slice(0, 10)).to.be.equal(selectors.handleBridgedTokens)
             const args = web3.eth.abi.decodeParameters(['address', 'address', 'uint256'], data.slice(10))
             expect(executor).to.be.equal(otherSideMediator)
             expect(dataType).to.be.bignumber.equal('0')
@@ -966,7 +1025,7 @@ function runTests(accounts, isHome) {
           const events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
           expect(events.length).to.be.equal(1)
           const { data } = events[0].returnValues
-          expect(data.slice(2, 10)).to.be.equal('0950d515')
+          expect(data.slice(0, 10)).to.be.equal(selectors.fixFailedMessage)
           const args = web3.eth.abi.decodeParameters(['bytes32'], data.slice(10))
           expect(args[0]).to.be.equal(failedMessageId)
         })
@@ -1001,8 +1060,8 @@ function runTests(accounts, isHome) {
 
           const events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
           expect(events.length).to.be.equal(2)
-          expect(events[0].returnValues.data.slice(2, 10)).to.be.equal('0950d515')
-          expect(events[1].returnValues.data.slice(2, 10)).to.be.equal('0950d515')
+          expect(events[0].returnValues.data.slice(0, 10)).to.be.equal(selectors.fixFailedMessage)
+          expect(events[1].returnValues.data.slice(0, 10)).to.be.equal(selectors.fixFailedMessage)
         })
       })
     })
@@ -1027,11 +1086,11 @@ function runTests(accounts, isHome) {
             const { data, dataType, executor } = events[0].returnValues
             let args
             if (receiver === tokenReceiver.address) {
-              expect(data.slice(2, 10)).to.be.equal('867f7a4d') // handleNativeTokensAndCall
+              expect(data.slice(0, 10)).to.be.equal(selectors.handleNativeTokensAndCall)
               args = web3.eth.abi.decodeParameters(['address', 'address', 'uint256', 'bytes'], data.slice(10))
               expect(args[3]).to.be.equal('0x1122')
             } else {
-              expect(data.slice(2, 10)).to.be.equal('272255bb') // handleNativeTokens
+              expect(data.slice(0, 10)).to.be.equal(selectors.handleNativeTokens)
               args = web3.eth.abi.decodeParameters(['address', 'address', 'uint256'], data.slice(10))
             }
             expect(executor).to.be.equal(otherSideMediator)
@@ -1049,11 +1108,11 @@ function runTests(accounts, isHome) {
             const { data: data2, dataType: dataType2 } = events[1].returnValues
             let args2
             if (receiver === tokenReceiver.address) {
-              expect(data2.slice(2, 10)).to.be.equal('867f7a4d') // handleNativeTokensAndCall
+              expect(data2.slice(0, 10)).to.be.equal(selectors.handleNativeTokensAndCall)
               args2 = web3.eth.abi.decodeParameters(['address', 'address', 'uint256', 'bytes'], data2.slice(10))
               expect(args2[3]).to.be.equal('0x1122')
             } else {
-              expect(data2.slice(2, 10)).to.be.equal('272255bb') // handleNativeTokens
+              expect(data2.slice(0, 10)).to.be.equal(selectors.handleNativeTokens)
               args2 = web3.eth.abi.decodeParameters(['address', 'address', 'uint256'], data2.slice(10))
             }
             expect(args2[0]).to.be.equal(otherSideToken1)
@@ -1491,7 +1550,7 @@ function runTests(accounts, isHome) {
           const events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
           expect(events.length).to.be.equal(1)
           const { data } = events[0].returnValues
-          expect(data.slice(2, 10)).to.be.equal('0950d515')
+          expect(data.slice(0, 10)).to.be.equal(selectors.fixFailedMessage)
           const args = web3.eth.abi.decodeParameters(['bytes32'], data.slice(10))
           expect(args[0]).to.be.equal(failedMessageId)
         })
@@ -1524,8 +1583,8 @@ function runTests(accounts, isHome) {
 
           const events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
           expect(events.length).to.be.equal(2)
-          expect(events[0].returnValues.data.slice(2, 10)).to.be.equal('0950d515')
-          expect(events[1].returnValues.data.slice(2, 10)).to.be.equal('0950d515')
+          expect(events[0].returnValues.data.slice(0, 10)).to.be.equal(selectors.fixFailedMessage)
+          expect(events[1].returnValues.data.slice(0, 10)).to.be.equal(selectors.fixFailedMessage)
         })
       })
 

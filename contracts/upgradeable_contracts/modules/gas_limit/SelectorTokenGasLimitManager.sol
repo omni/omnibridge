@@ -37,7 +37,7 @@ contract SelectorTokenGasLimitManager is OwnableModule {
     modifier validGasLimits(uint256 _length, uint256[] calldata _gasLimits) {
         require(_gasLimits.length == _length);
         uint256 maxGasLimit = bridge.maxGasPerTx();
-        for (uint256 i = 0; i < 7; i++) {
+        for (uint256 i = 0; i < _length; i++) {
             require(_gasLimits[i] <= maxGasLimit);
         }
         _;
