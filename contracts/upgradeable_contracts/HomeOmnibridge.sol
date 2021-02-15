@@ -62,17 +62,20 @@ contract HomeOmnibridge is
      * Sets the token factory contract. Resumes token bridging in the home to foreign direction.
      * @param _tokenFactory address of the deployed TokenFactory contract.
      * @param _forwardingRulesManager address of the deployed MultiTokenForwardingRulesManager contract.
+     * @param _gasLimitManager address of the deployed SelectorTokenGasLimitManager contract.
      * @param _dailyLimit default daily limits used before stopping the bridge operation.
      */
     function upgradeToReverseMode(
         address _tokenFactory,
         address _forwardingRulesManager,
+        address _gasLimitManager,
         uint256 _dailyLimit
     ) external {
         require(msg.sender == address(this));
 
         _setTokenFactory(_tokenFactory);
         _setForwardingRulesManager(_forwardingRulesManager);
+        _setGasLimitManager(_gasLimitManager);
 
         uintStorage[keccak256(abi.encodePacked("dailyLimit", address(0)))] = _dailyLimit;
         emit DailyLimitChanged(address(0), _dailyLimit);
