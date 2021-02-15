@@ -1,4 +1,4 @@
-const { fromWei, toWei } = require('web3').utils
+const { fromWei } = require('web3').utils
 const { web3Home, deploymentAddress } = require('../web3')
 const { EternalStorageProxy, HomeOmnibridge } = require('../loadContracts')
 const { sendRawTxHome, transferProxyOwnership } = require('../deploymentUtils')
@@ -13,10 +13,6 @@ const {
   HOME_MEDIATOR_REQUEST_GAS_LIMIT,
   HOME_BRIDGE_OWNER,
   HOME_UPGRADEABLE_ADMIN,
-  HOME_REWARDABLE,
-  HOME_TRANSACTIONS_FEE,
-  FOREIGN_TRANSACTIONS_FEE,
-  HOME_MEDIATOR_REWARD_ACCOUNTS,
 } = require('../loadEnv')
 
 async function initializeMediator({
@@ -32,9 +28,7 @@ async function initializeMediator({
     requestGasLimit,
     owner,
     tokenFactory,
-    rewardAddressList,
-    homeToForeignFee,
-    foreignToHomeFee,
+    feeManager,
   },
 }) {
   console.log(`
@@ -48,14 +42,8 @@ async function initializeMediator({
     MEDIATOR_REQUEST_GAS_LIMIT : ${requestGasLimit},
     OWNER: ${owner},
     TOKEN_FACTORY: ${tokenFactory},
-    REWARD_ADDRESS_LIST: [${rewardAddressList.join(', ')}]
+    FEE_MANAGER: ${feeManager}
   `)
-  if (HOME_REWARDABLE === 'BOTH_DIRECTIONS') {
-    console.log(`
-    HOME_TO_FOREIGN_FEE: ${homeToForeignFee} which is ${HOME_TRANSACTIONS_FEE * 100}%
-    FOREIGN_TO_HOME_FEE: ${foreignToHomeFee} which is ${FOREIGN_TRANSACTIONS_FEE * 100}%
-    `)
-  }
 
   return contract.methods
     .initialize(
@@ -66,24 +54,16 @@ async function initializeMediator({
       requestGasLimit.toString(),
       owner,
       tokenFactory,
-      rewardAddressList,
-      [homeToForeignFee.toString(), foreignToHomeFee.toString()]
+      feeManager
     )
     .encodeABI()
 }
 
-async function initialize({ homeBridge, foreignBridge, tokenFactory }) {
+async function initialize({ homeBridge, foreignBridge, tokenFactory, feeManager }) {
   let nonce = await web3Home.eth.getTransactionCount(deploymentAddress)
   const mediatorContract = new web3Home.eth.Contract(HomeOmnibridge.abi, homeBridge)
 
   console.log('\n[Home] Initializing Bridge Mediator with following parameters:')
-  let homeFeeInWei = '0'
-  let foreignFeeInWei = '0'
-  if (HOME_REWARDABLE === 'BOTH_DIRECTIONS') {
-    homeFeeInWei = toWei(HOME_TRANSACTIONS_FEE.toString(), 'ether')
-    foreignFeeInWei = toWei(FOREIGN_TRANSACTIONS_FEE.toString(), 'ether')
-  }
-  const rewardList = HOME_MEDIATOR_REWARD_ACCOUNTS.split(' ')
 
   const initializeMediatorData = await initializeMediator({
     contract: mediatorContract,
@@ -98,9 +78,7 @@ async function initialize({ homeBridge, foreignBridge, tokenFactory }) {
       executionDailyLimit: FOREIGN_DAILY_LIMIT,
       executionMaxPerTx: FOREIGN_MAX_AMOUNT_PER_TX,
       tokenFactory,
-      rewardAddressList: rewardList,
-      homeToForeignFee: homeFeeInWei,
-      foreignToHomeFee: foreignFeeInWei,
+      feeManager,
     },
   })
 

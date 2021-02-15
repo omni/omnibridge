@@ -34,8 +34,7 @@ ForeignOmnibridge::onTokenTransfer/relayTokens
 ..ForeignOmnibridge::bridgeSpecificActionsOnTokenTransfer
 ....TokensBridgeLimits::isTokenRegistered -> false
 ....TokenReader::readDecimals
-....BasicOmnibridge::_initToken
-......TokensBridgeLimits::_initializeTokenBridgeLimits
+....TokensBridgeLimits::_initializeTokenBridgeLimits
 ....TokensBridgeLimits::withinLimit
 ....TokensBridgeLimits::addTotalSpentPerDay
 ....BasicOmnibridge::_prepareMessage
@@ -96,16 +95,17 @@ BasicHomeAMB::executeAffirmation
 ..........HomeOmnibridge::_transformName
 ..........TokenFactory::deploy
 ..........BasicOmnibridge::_setTokenAddressPair
-..........HomeOmnibridge::_initToken
-............TokensBridgeLimits::_initializeTokenBridgeLimits
-............HomeOmnibridgeFeeManager::_setFee
-............HomeOmnibridgeFeeManager::_setFee
+..........TokensBridgeLimits::_initializeTokenBridgeLimits
 ..........HomeOmnibridge::_handleTokens
 ............TokensBridgeLimits::withinExecutionLimit
 ............TokensBridgeLimits::addTotalExecutedPerDay
-............HomeOmnibridgeFeeManager::_distributeFee
-..............HomeOmnibridgeFeeManager::calculateFee
+............OmnibridgeFeeManagerConnector::_distributeFee
+..............OmnibridgeFeeManager::calculateFee
 ..............IBurnableMintableERC677Token::mint
+..............OmnibridgeFeeManager::distributeFee
+>>FeeManager
+................ERC20::transfer
+>>Mediator
 ............MessageProcessor::messageId
 ............emit FeeDistributed
 ............IBurnableMintableERC677Token::mint
@@ -133,9 +133,13 @@ BasicHomeAMB::executeAffirmation
 ..........HomeOmnibridge::_handleTokens
 ............TokensBridgeLimits::withinExecutionLimit
 ............TokensBridgeLimits::addTotalExecutedPerDay
-............HomeOmnibridgeFeeManager::_distributeFee
-..............HomeOmnibridgeFeeManager::calculateFee
+............OmnibridgeFeeManagerConnector::_distributeFee
+..............OmnibridgeFeeManager::calculateFee
 ..............IBurnableMintableERC677Token::mint
+..............OmnibridgeFeeManager::distributeFee
+>>FeeManager
+................ERC20::transfer
+>>Mediator
 ............MessageProcessor::messageId
 ............emit FeeDistributed
 ............IBurnableMintableERC677Token::mint
@@ -169,9 +173,13 @@ HomeOmnibridge::onTokenTransfer/relayTokens
 ....TokensBridgeLimits::withinLimit
 ....TokensBridgeLimits::addTotalSpentPerDay
 ....HomeOmnibridgeFeeManager::isRewardAddress
-....HomeOmnibridgeFeeManager::_distributeFee
-......HomeOmnibridgeFeeManager::calculateFee
-......IERC677::transfer
+....OmnibridgeFeeManagerConnector::_distributeFee
+......OmnibridgeFeeManager::calculateFee
+......ERC20::transfer
+......OmnibridgeFeeManager::distributeFee
+>>FeeManager
+........ERC20::transfer
+>>Mediator
 ....BasicOmnibridge::_prepareMessage
 ......IBurnableMintableERC677Token::burn
 ....HomeOmnibridge::_passMessage
@@ -239,14 +247,17 @@ HomeOmnibridge::onTokenTransfer/relayTokens
 ..HomeOmnibridge::bridgeSpecificActionsOnTokenTransfer
 ....TokensBridgeLimits::isTokenRegistered -> false
 ....TokenReader::readDecimals
-....BasicOmnibridge::_initToken
-......TokensBridgeLimits::_initializeTokenBridgeLimits
+....TokensBridgeLimits::_initializeTokenBridgeLimits
 ....TokensBridgeLimits::withinLimit
 ....TokensBridgeLimits::addTotalSpentPerDay
 ....HomeOmnibridgeFeeManager::isRewardAddress
-....HomeOmnibridgeFeeManager::_distributeFee
-......HomeOmnibridgeFeeManager::calculateFee
-......SafeERC20::safeTransfer
+....OmnibridgeFeeManagerConnector::_distributeFee
+......OmnibridgeFeeManager::calculateFee
+......SafeERC20::transfer
+......OmnibridgeFeeManager::distributeFee
+>>FeeManager
+........ERC20::transfer
+>>Mediator
 ....BasicOmnibridge::_prepareMessage
 ......TokenReader::readName
 ......TokenReader::readSymbol
@@ -274,9 +285,13 @@ HomeOmnibridge::onTokenTransfer/relayTokens
 ....TokensBridgeLimits::withinLimit
 ....TokensBridgeLimits::addTotalSpentPerDay
 ....HomeOmnibridgeFeeManager::isRewardAddress
-....HomeOmnibridgeFeeManager::_distributeFee
-......HomeOmnibridgeFeeManager::calculateFee
-......SafeERC20::safeTransfer
+....OmnibridgeFeeManagerConnector::_distributeFee
+......OmnibridgeFeeManager::calculateFee
+......SafeERC20::transfer
+......OmnibridgeFeeManager::distributeFee
+>>FeeManager
+........ERC20::transfer
+>>Mediator
 ....BasicOmnibridge::_prepareMessage
 ......MediatorBalanceStorage::_setMediatorBalance
 >>Bridge
@@ -308,8 +323,7 @@ BasicForeignAMB::executeSignatures
 ..........ForeignOmnibridge::_transformName
 ..........TokenFactory::deploy
 ..........BasicOmnibridge::_setTokenAddressPair
-..........ForeignOmnibridge::_initToken
-............TokensBridgeLimits::_initializeTokenBridgeLimits
+..........TokensBridgeLimits::_initializeTokenBridgeLimits
 ..........ForeignOmnibridge::_handleTokens
 ............TokensBridgeLimits::withinExecutionLimit
 ............TokensBridgeLimits::addTotalExecutedPerDay
@@ -400,9 +414,13 @@ BasicHomeAMB::executeAffirmation
 ..........HomeOmnibridge::_handleTokens
 ............TokensBridgeLimits::withinExecutionLimit
 ............TokensBridgeLimits::addTotalExecutedPerDay
-............HomeOmnibridgeFeeManager::_distributeFee
-..............HomeOmnibridgeFeeManager::calculateFee
-..............IBurnableMintableERC677Token::mint
+............OmnibridgeFeeManagerConnector::_distributeFee
+..............OmnibridgeFeeManager::calculateFee
+..............SafeERC20::safeTransfer
+..............OmnibridgeFeeManager::distributeFee
+>>FeeManager
+................ERC20::transfer
+>>Mediator
 ............MessageProcessor::messageId
 ............emit FeeDistributed
 ............SafeERC20::safeTransfer
