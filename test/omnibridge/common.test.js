@@ -6,6 +6,7 @@ const Sacrifice = artifacts.require('Sacrifice')
 const TokenFactory = artifacts.require('TokenFactory')
 const MultiTokenForwardingRulesManager = artifacts.require('MultiTokenForwardingRulesManager')
 const OmnibridgeFeeManager = artifacts.require('OmnibridgeFeeManager')
+const SelectorTokenGasLimitManager = artifacts.require('SelectorTokenGasLimitManager')
 const TokenReceiver = artifacts.require('TokenReceiver')
 
 const { expect } = require('chai')
@@ -66,7 +67,7 @@ function runTests(accounts, isHome) {
       opts.otherSideMediator || otherSideMediator,
       opts.limits || [dailyLimit, maxPerTx, minPerTx],
       opts.executionLimits || [executionDailyLimit, executionMaxPerTx],
-      opts.requestGasLimit || 1000000,
+      isHome ? opts.gasLimitManager || ZERO_ADDRESS : opts.requestGasLimit || 1000000,
       opts.owner || owner,
       opts.tokenFactory || tokenFactory.address,
     ]
@@ -218,7 +219,11 @@ function runTests(accounts, isHome) {
       expect(await contract.minPerTx(ZERO_ADDRESS)).to.be.bignumber.equal(ZERO)
       expect(await contract.executionDailyLimit(ZERO_ADDRESS)).to.be.bignumber.equal(ZERO)
       expect(await contract.executionMaxPerTx(ZERO_ADDRESS)).to.be.bignumber.equal(ZERO)
-      expect(await contract.methods['requestGasLimit()']()).to.be.bignumber.equal(ZERO)
+      if (isHome) {
+        expect(await contract.gasLimitManager()).to.be.equal(ZERO_ADDRESS)
+      } else {
+        expect(await contract.requestGasLimit()).to.be.bignumber.equal(ZERO)
+      }
       expect(await contract.owner()).to.be.equal(ZERO_ADDRESS)
       expect(await contract.tokenFactory()).to.be.equal(ZERO_ADDRESS)
 
@@ -235,8 +240,13 @@ function runTests(accounts, isHome) {
       // executionDailyLimit > executionMaxPerTx
       await initialize({ executionLimits: [executionDailyLimit, executionDailyLimit] }).should.be.rejected
 
-      // maxGasPerTx > bridge maxGasPerTx
-      await initialize({ requestGasLimit: ether('1') }).should.be.rejected
+      if (isHome) {
+        // gas limit manage is not a contract
+        await initialize({ gasLimitManager: owner }).should.be.rejected
+      } else {
+        // maxGasPerTx > bridge maxGasPerTx
+        await initialize({ requestGasLimit: ether('1') }).should.be.rejected
+      }
 
       // not valid owner
       await initialize({ owner: ZERO_ADDRESS }).should.be.rejected
@@ -258,7 +268,11 @@ function runTests(accounts, isHome) {
       expect(await contract.minPerTx(ZERO_ADDRESS)).to.be.bignumber.equal(minPerTx)
       expect(await contract.executionDailyLimit(ZERO_ADDRESS)).to.be.bignumber.equal(executionDailyLimit)
       expect(await contract.executionMaxPerTx(ZERO_ADDRESS)).to.be.bignumber.equal(executionMaxPerTx)
-      expect(await contract.methods['requestGasLimit()']()).to.be.bignumber.equal('1000000')
+      if (isHome) {
+        expect(await contract.gasLimitManager()).to.be.equal(ZERO_ADDRESS)
+      } else {
+        expect(await contract.requestGasLimit()).to.be.bignumber.equal('1000000')
+      }
       expect(await contract.owner()).to.be.equal(owner)
       expect(await contract.tokenFactory()).to.be.equal(tokenFactory.address)
 
@@ -386,45 +400,43 @@ function runTests(accounts, isHome) {
         })
       })
 
-      describe('request gas limit', () => {
-        it('should allow to set default gas limit', async () => {
-          const method = contract.methods['setRequestGasLimit(uint256)']
-          await method(200000, { from: user }).should.be.rejected
-          await method(200000, { from: owner }).should.be.fulfilled
+      if (isHome) {
+        describe('gas limit manager', () => {
+          let manager
+          beforeEach(async () => {
+            manager = await SelectorTokenGasLimitManager.new(ambBridgeContract.address, owner)
+          })
 
-          expect(await contract.methods['requestGasLimit()']()).to.be.bignumber.equal('200000')
-        })
+          it('should allow to set new manager', async () => {
+            expect(await contract.gasLimitManager()).to.be.equal(ZERO_ADDRESS)
 
-        it('should use the custom gas limit when bridging tokens', async () => {
-          await sendFunctions[0](ether('0.01')).should.be.fulfilled
-          await sendFunctions[0](ether('0.01')).should.be.fulfilled
+            await contract.setGasLimitManager(manager.address, { from: user }).should.be.rejected
+            await contract.setGasLimitManager(manager.address, { from: owner }).should.be.fulfilled
 
-          await contract.methods['setRequestGasLimit(uint256)'](200000).should.be.fulfilled
+            expect(await contract.gasLimitManager()).to.be.equal(manager.address)
+            expect(await manager.owner()).to.be.equal(owner)
+            expect(await manager.bridge()).to.be.equal(ambBridgeContract.address)
+            expect(await manager.methods['requestGasLimit()']()).to.be.bignumber.equal('1000000')
+          })
 
-          await sendFunctions[0](ether('0.01')).should.be.fulfilled
-
-          const events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
-          expect(events.length).to.be.equal(3)
-          expect(events[0].returnValues.gas).to.be.equal('1000000')
-          expect(events[1].returnValues.gas).to.be.equal('1000000')
-          expect(events[2].returnValues.gas).to.be.equal('200000')
-        })
-
-        if (isHome) {
           it('should allow to set request gas limit for specific selector', async () => {
-            const method = contract.methods['setRequestGasLimit(bytes4,uint256)']
+            await contract.setGasLimitManager(manager.address).should.be.fulfilled
+
+            const method = manager.methods['setRequestGasLimit(bytes4,uint256)']
             await method('0xffffffff', 200000, { from: user }).should.be.rejected
             await method('0xffffffff', 200000, { from: owner }).should.be.fulfilled
 
-            expect(await contract.methods['requestGasLimit(bytes4)']('0xffffffff')).to.be.bignumber.equal('200000')
-            expect(await contract.methods['requestGasLimit()']()).to.be.bignumber.equal('1000000')
+            expect(await manager.methods['requestGasLimit(bytes4)']('0xffffffff')).to.be.bignumber.equal('200000')
+            expect(await manager.methods['requestGasLimit()']()).to.be.bignumber.equal('1000000')
           })
 
           it('should use the custom gas limit when bridging tokens', async () => {
+            await contract.setGasLimitManager(manager.address).should.be.fulfilled
+
             await sendFunctions[0](ether('0.01')).should.be.fulfilled
             await sendFunctions[0](ether('0.01')).should.be.fulfilled
 
-            await contract.methods['setRequestGasLimit(bytes4,uint256)']('0x125e4cfb', 200000).should.be.fulfilled
+            await manager.methods['setRequestGasLimit(bytes4,uint256)']('0x125e4cfb', 200000).should.be.fulfilled
 
             await sendFunctions[0](ether('0.01')).should.be.fulfilled
 
@@ -436,24 +448,28 @@ function runTests(accounts, isHome) {
           })
 
           it('should allow to set request gas limit for specific selector and token', async () => {
-            const method = contract.methods['setRequestGasLimit(bytes4,address,uint256)']
+            await contract.setGasLimitManager(manager.address).should.be.fulfilled
+
+            const method = manager.methods['setRequestGasLimit(bytes4,address,uint256)']
             await method('0xffffffff', token.address, 200000, { from: user }).should.be.rejected
             await method('0xffffffff', token.address, 200000, { from: owner }).should.be.fulfilled
 
             expect(
-              await contract.methods['requestGasLimit(bytes4,address)']('0xffffffff', token.address)
+              await manager.methods['requestGasLimit(bytes4,address)']('0xffffffff', token.address)
             ).to.be.bignumber.equal('200000')
-            expect(await contract.methods['requestGasLimit(bytes4)']('0xffffffff')).to.be.bignumber.equal('0')
-            expect(await contract.methods['requestGasLimit()']()).to.be.bignumber.equal('1000000')
+            expect(await manager.methods['requestGasLimit(bytes4)']('0xffffffff')).to.be.bignumber.equal('0')
+            expect(await manager.methods['requestGasLimit()']()).to.be.bignumber.equal('1000000')
           })
 
           it('should use the custom gas limit when bridging specific token', async () => {
-            await contract.methods['setRequestGasLimit(bytes4,uint256)']('0x125e4cfb', 100000).should.be.fulfilled
+            await contract.setGasLimitManager(manager.address).should.be.fulfilled
+
+            await manager.methods['setRequestGasLimit(bytes4,uint256)']('0x125e4cfb', 100000).should.be.fulfilled
 
             await sendFunctions[0](ether('0.01')).should.be.fulfilled
             await sendFunctions[0](ether('0.01')).should.be.fulfilled
 
-            await contract.methods['setRequestGasLimit(bytes4,address,uint256)']('0x125e4cfb', token.address, 200000)
+            await manager.methods['setRequestGasLimit(bytes4,address,uint256)']('0x125e4cfb', token.address, 200000)
               .should.be.fulfilled
 
             await sendFunctions[0](ether('0.01')).should.be.fulfilled
@@ -464,8 +480,32 @@ function runTests(accounts, isHome) {
             expect(events[1].returnValues.gas).to.be.equal('100000')
             expect(events[2].returnValues.gas).to.be.equal('200000')
           })
-        }
-      })
+        })
+      } else {
+        describe('request gas limit', () => {
+          it('should allow to set default gas limit', async () => {
+            await contract.setRequestGasLimit(200000, { from: user }).should.be.rejected
+            await contract.setRequestGasLimit(200000, { from: owner }).should.be.fulfilled
+
+            expect(await contract.requestGasLimit()).to.be.bignumber.equal('200000')
+          })
+
+          it('should use the custom gas limit when bridging tokens', async () => {
+            await sendFunctions[0](ether('0.01')).should.be.fulfilled
+            await sendFunctions[0](ether('0.01')).should.be.fulfilled
+
+            await contract.setRequestGasLimit(200000).should.be.fulfilled
+
+            await sendFunctions[0](ether('0.01')).should.be.fulfilled
+
+            const events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
+            expect(events.length).to.be.equal(3)
+            expect(events[0].returnValues.gas).to.be.equal('1000000')
+            expect(events[1].returnValues.gas).to.be.equal('1000000')
+            expect(events[2].returnValues.gas).to.be.equal('200000')
+          })
+        })
+      }
     })
 
     function commonRelayTests() {
