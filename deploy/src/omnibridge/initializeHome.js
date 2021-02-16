@@ -1,4 +1,4 @@
-const { fromWei, toWei } = require('web3').utils
+const { fromWei } = require('web3').utils
 const { web3Home, deploymentAddress } = require('../web3')
 const { EternalStorageProxy, HomeOmnibridge } = require('../loadContracts')
 const { sendRawTxHome, transferProxyOwnership } = require('../deploymentUtils')
@@ -13,20 +13,13 @@ const {
   HOME_MEDIATOR_REQUEST_GAS_LIMIT,
   HOME_BRIDGE_OWNER,
   HOME_UPGRADEABLE_ADMIN,
-  HOME_REWARDABLE,
-  HOME_TRANSACTIONS_FEE,
-  FOREIGN_TRANSACTIONS_FEE,
-  HOME_MEDIATOR_REWARD_ACCOUNTS,
 } = require('../loadEnv')
 
-async function initialize({ homeBridge, foreignBridge, tokenFactory }) {
+async function initialize({ homeBridge, foreignBridge, tokenFactory, feeManager }) {
   let nonce = await web3Home.eth.getTransactionCount(deploymentAddress)
   const contract = new web3Home.eth.Contract(HomeOmnibridge.abi, homeBridge)
 
   console.log('\n[Home] Initializing Bridge Mediator with following parameters:')
-  const isRewardable = HOME_REWARDABLE === 'BOTH_DIRECTIONS'
-  const homeFee = isRewardable ? HOME_TRANSACTIONS_FEE : '0'
-  const foreignFee = isRewardable ? FOREIGN_TRANSACTIONS_FEE : '0'
 
   console.log(`
     AMB contract: ${HOME_AMB_BRIDGE},
@@ -39,14 +32,8 @@ async function initialize({ homeBridge, foreignBridge, tokenFactory }) {
     MEDIATOR_REQUEST_GAS_LIMIT: ${HOME_MEDIATOR_REQUEST_GAS_LIMIT},
     OWNER: ${HOME_BRIDGE_OWNER},
     TOKEN_FACTORY: ${tokenFactory},
-    REWARD_ADDRESS_LIST: [${HOME_MEDIATOR_REWARD_ACCOUNTS.join(', ')}]
-  `)
-  if (HOME_REWARDABLE === 'BOTH_DIRECTIONS') {
-    console.log(`
-    HOME_TO_FOREIGN_FEE: ${toWei(homeFee)} which is ${homeFee * 100}%
-    FOREIGN_TO_HOME_FEE: ${toWei(foreignFee)} which is ${foreignFee * 100}%
+    FEE_MANAGER: ${feeManager}
     `)
-  }
 
   const initializeMediatorData = contract.methods
     .initialize(
@@ -57,8 +44,7 @@ async function initialize({ homeBridge, foreignBridge, tokenFactory }) {
       HOME_MEDIATOR_REQUEST_GAS_LIMIT,
       HOME_BRIDGE_OWNER,
       tokenFactory,
-      HOME_MEDIATOR_REWARD_ACCOUNTS,
-      [toWei(homeFee), toWei(foreignFee)]
+      feeManager
     )
     .encodeABI()
 

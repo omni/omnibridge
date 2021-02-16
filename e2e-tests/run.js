@@ -7,11 +7,13 @@ const Web3 = require('web3')
 
 const AMBABI = require('../build/contracts/IAMB.json').abi
 const HomeABI = [...require('../build/contracts/HomeOmnibridge.json').abi, ...AMBABI.filter((x) => x.type === 'event')]
+const FeeManagerABI = [...require('../build/contracts/OmnibridgeFeeManager.json').abi]
 const ForeignABI = [
   ...require('../build/contracts/ForeignOmnibridge.json').abi,
   ...AMBABI.filter((x) => x.type === 'event'),
 ]
 const ERC677 = require('../precompiled/ERC677BridgeToken.json')
+const TokenReceiver = require('../build/contracts/TokenReceiver.json')
 
 const scenarios = [
   require('./scenarios/claimForeignTokens'),
@@ -24,6 +26,8 @@ const scenarios = [
   require('./scenarios/fixHomeMediatorBalance'),
   require('./scenarios/homeRequestFailedMessageFix'),
   require('./scenarios/foreignRequestFailedMessageFix'),
+  require('./scenarios/bridgeForeignTokensAndCall'),
+  require('./scenarios/bridgeHomeTokensAndCall'),
 ]
 const { toWei, toBN, ZERO_ADDRESS, toAddress, addPendingTxLogger } = require('./utils')
 
@@ -62,6 +66,19 @@ async function deployToken(web3, options, bytecode = ERC677.bytecode) {
   console.log(`Minting 1000 tokens to the ${options.from}`)
   await token.methods.mint(options.from, toWei('1000')).send()
   return token
+}
+
+async function deployTokenReceiver(web3, options, bytecode = TokenReceiver.bytecode) {
+  const tokenReceiver = await new web3.eth.Contract(TokenReceiver.abi, ZERO_ADDRESS, options)
+    .deploy({
+      data: bytecode,
+      arguments: [],
+    })
+    .send({
+      gas: 5000000,
+    })
+  console.log(`Deployed token receiver ${tokenReceiver.options.address}`)
+  return tokenReceiver
 }
 
 const findMessageId = (receipt) =>
@@ -177,15 +194,16 @@ async function createEnv(web3Home, web3Foreign) {
   const homeAMB = new web3Home.eth.Contract(AMBABI, await homeMediator.methods.bridgeContract().call())
 
   console.log('Fetching fee types')
-  const homeFeeType = await homeMediator.methods.HOME_TO_FOREIGN_FEE().call()
-  const foreignFeeType = await homeMediator.methods.FOREIGN_TO_HOME_FEE().call()
+  const feeManager = new web3Home.eth.Contract(FeeManagerABI, await homeMediator.methods.feeManager().call())
+  const homeFeeType = await feeManager.methods.HOME_TO_FOREIGN_FEE().call()
+  const foreignFeeType = await feeManager.methods.FOREIGN_TO_HOME_FEE().call()
 
   console.log('Fetching reward address count')
-  const feeEnabled = (await homeMediator.methods.rewardAddressCount().call()) > 0
+  const feeEnabled = (await feeManager.methods.rewardAddressCount().call()) > 0
 
   console.log('Fetching fee values')
-  const homeFee = toBN(feeEnabled ? await homeMediator.methods.getFee(homeFeeType, ZERO_ADDRESS).call() : 0)
-  const foreignFee = toBN(feeEnabled ? await homeMediator.methods.getFee(foreignFeeType, ZERO_ADDRESS).call() : 0)
+  const homeFee = toBN(feeEnabled ? await feeManager.methods.getFee(homeFeeType, ZERO_ADDRESS).call() : 0)
+  const foreignFee = toBN(feeEnabled ? await feeManager.methods.getFee(foreignFeeType, ZERO_ADDRESS).call() : 0)
   const oneEthBN = toBN('1000000000000000000')
   console.log(`Home fee: ${homeFee.div(toBN('10000000000000000')).toString(10)}%`)
   console.log(`Foreign fee: ${foreignFee.div(toBN('10000000000000000')).toString(10)}%`)
@@ -224,6 +242,9 @@ async function createEnv(web3Home, web3Foreign) {
     foreignClaimableToken = await deployToken(web3Foreign, foreignOptions)
   }
 
+  const homeTokenReceiver = await deployTokenReceiver(web3Home, homeOptions)
+  const foreignTokenReceiver = await deployTokenReceiver(web3Foreign, foreignOptions)
+
   console.log('Fetching block numbers')
   const homeBlockNumber = await web3Home.eth.getBlockNumber()
   const foreignBlockNumber = await web3Foreign.eth.getBlockNumber()
@@ -234,6 +255,7 @@ async function createEnv(web3Home, web3Foreign) {
       mediator: homeMediator,
       amb: homeAMB,
       token: homeToken,
+      tokenReceiver: homeTokenReceiver,
       claimableToken: homeClaimableToken,
       getBridgedToken: makeGetBridgedToken(web3Home, homeMediator, homeOptions),
       waitUntilProcessed: makeWaitUntilProcessed(homeAMB, 'AffirmationCompleted', homeBlockNumber),
@@ -247,6 +269,7 @@ async function createEnv(web3Home, web3Foreign) {
       mediator: foreignMediator,
       amb: foreignAMB,
       token: foreignToken,
+      tokenReceiver: foreignTokenReceiver,
       claimableToken: foreignClaimableToken,
       getBridgedToken: makeGetBridgedToken(web3Foreign, foreignMediator, foreignOptions),
       waitUntilProcessed: makeWaitUntilProcessed(foreignAMB, 'RelayedMessage', foreignBlockNumber),

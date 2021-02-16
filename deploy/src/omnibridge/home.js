@@ -1,8 +1,24 @@
+const { toWei } = require('web3').utils
 const { web3Home, deploymentAddress } = require('../web3')
 const { deployContract, upgradeProxy } = require('../deploymentUtils')
-const { HOME_ERC677_TOKEN_IMAGE, HOME_TOKEN_FACTORY, HOME_BRIDGE_OWNER } = require('../loadEnv')
+const {
+  HOME_ERC677_TOKEN_IMAGE,
+  HOME_TOKEN_FACTORY,
+  HOME_BRIDGE_OWNER,
+  HOME_REWARDABLE,
+  HOME_TRANSACTIONS_FEE,
+  FOREIGN_TRANSACTIONS_FEE,
+  HOME_MEDIATOR_REWARD_ACCOUNTS,
+} = require('../loadEnv')
+const { ZERO_ADDRESS } = require('../constants')
 
-const { EternalStorageProxy, HomeOmnibridge, PermittableToken, TokenFactory } = require('../loadContracts')
+const {
+  EternalStorageProxy,
+  HomeOmnibridge,
+  PermittableToken,
+  TokenFactory,
+  OmnibridgeFeeManager,
+} = require('../loadContracts')
 
 async function deployHome() {
   let nonce = await web3Home.eth.getTransactionCount(deploymentAddress)
@@ -37,6 +53,24 @@ async function deployHome() {
     console.log('\n[Home] Using existing token factory: ', tokenFactory)
   }
 
+  let feeManager = ZERO_ADDRESS
+  if (HOME_REWARDABLE === 'BOTH_DIRECTIONS') {
+    const homeFee = toWei(HOME_TRANSACTIONS_FEE)
+    const foreignFee = toWei(FOREIGN_TRANSACTIONS_FEE)
+    console.log(`[Home] Deploying Fee Manager contract with the following parameters:
+    REWARD_ADDRESS_LIST: [${HOME_MEDIATOR_REWARD_ACCOUNTS.join(', ')}]
+    HOME_TO_FOREIGN_FEE: ${homeFee} which is ${HOME_TRANSACTIONS_FEE * 100}%
+    FOREIGN_TO_HOME_FEE: ${foreignFee} which is ${FOREIGN_TRANSACTIONS_FEE * 100}%
+    `)
+    const manager = await deployContract(
+      OmnibridgeFeeManager,
+      [homeBridgeStorage.options.address, HOME_BRIDGE_OWNER, HOME_MEDIATOR_REWARD_ACCOUNTS, [homeFee, foreignFee]],
+      { nonce: nonce++ }
+    )
+    feeManager = manager.options.address
+    console.log('\n[Home] New fee manager has been deployed: ', feeManager)
+  }
+
   console.log('\n[Home] Deploying Bridge Mediator implementation\n')
   const homeBridgeImplementation = await deployContract(HomeOmnibridge, [], {
     nonce: nonce++,
@@ -55,6 +89,7 @@ async function deployHome() {
   return {
     homeBridgeMediator: { address: homeBridgeStorage.options.address },
     tokenFactory: { address: tokenFactory },
+    feeManager: { address: feeManager },
   }
 }
 
