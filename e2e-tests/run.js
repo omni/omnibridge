@@ -5,13 +5,20 @@ require('dotenv').config({
 })
 const Web3 = require('web3')
 
+const filterEvents = (arr) => arr.filter((x) => x.type === 'event')
+
 const AMBABI = require('../build/contracts/IAMB.json').abi
-const HomeABI = [...require('../build/contracts/HomeOmnibridge.json').abi, ...AMBABI.filter((x) => x.type === 'event')]
+
+const AMBEventABI = filterEvents(AMBABI)
+
+const HomeABI = [...require('../build/contracts/HomeOmnibridge.json').abi, ...AMBEventABI]
+const ForeignABI = [...require('../build/contracts/ForeignOmnibridge.json').abi, ...AMBEventABI]
 const FeeManagerABI = [...require('../build/contracts/OmnibridgeFeeManager.json').abi]
-const ForeignABI = [
-  ...require('../build/contracts/ForeignOmnibridge.json').abi,
-  ...AMBABI.filter((x) => x.type === 'event'),
-]
+const WETH = require('../build/contracts/WETH.json')
+const WETHOmnibridgeRouter = require('../build/contracts/WETHOmnibridgeRouter.json')
+
+const WETHOmnibridgeRouterABI = [...WETHOmnibridgeRouter.abi, ...AMBEventABI]
+
 const ERC677 = require('../precompiled/ERC677BridgeToken.json')
 const TokenReceiver = require('../build/contracts/TokenReceiver.json')
 
@@ -28,14 +35,11 @@ const scenarios = [
   require('./scenarios/foreignRequestFailedMessageFix'),
   require('./scenarios/bridgeForeignTokensAndCall'),
   require('./scenarios/bridgeHomeTokensAndCall'),
+  require('./scenarios/bridgeNativeETH'),
 ]
 const { toWei, toBN, ZERO_ADDRESS, toAddress, addPendingTxLogger } = require('./utils')
 
-const TokenABI = [
-  ...ERC677.abi,
-  ...HomeABI.filter((x) => x.type === 'event'),
-  ...AMBABI.filter((x) => x.type === 'event'),
-]
+const TokenABI = [...ERC677.abi, ...filterEvents(HomeABI), ...AMBEventABI]
 
 const {
   HOME_RPC_URL,
@@ -53,32 +57,42 @@ const {
   OWNER_ACCOUNT_PRIVATE_KEY,
 } = process.env
 
-async function deployToken(web3, options, bytecode = ERC677.bytecode) {
-  const token = await new web3.eth.Contract(TokenABI, ZERO_ADDRESS, options)
+function deploy(web3, options, abi, bytecode, args) {
+  return new web3.eth.Contract(abi, ZERO_ADDRESS, options)
     .deploy({
       data: bytecode,
-      arguments: ['Test Token', 'TST', 18],
+      arguments: args,
     })
     .send({
       gas: 5000000,
     })
+}
+
+async function deployToken(web3, options, bytecode = ERC677.bytecode) {
+  const token = await deploy(web3, options, TokenABI, bytecode, ['Test Token', 'TST', 18])
   console.log(`Deployed token ${token.options.address}`)
   console.log(`Minting 1000 tokens to the ${options.from}`)
   await token.methods.mint(options.from, toWei('1000')).send()
   return token
 }
 
-async function deployTokenReceiver(web3, options, bytecode = TokenReceiver.bytecode) {
-  const tokenReceiver = await new web3.eth.Contract(TokenReceiver.abi, ZERO_ADDRESS, options)
-    .deploy({
-      data: bytecode,
-      arguments: [],
-    })
-    .send({
-      gas: 5000000,
-    })
+async function deployTokenReceiver(web3, options) {
+  const tokenReceiver = await deploy(web3, options, TokenReceiver.abi, TokenReceiver.bytecode)
   console.log(`Deployed token receiver ${tokenReceiver.options.address}`)
   return tokenReceiver
+}
+
+async function deployWETH(web3, options) {
+  const contract = await deploy(web3, options, WETH.abi, WETH.bytecode)
+  console.log(`Deployed WETH token ${contract.options.address}`)
+  return contract
+}
+
+async function deployWETHRouter(web3, options, bridge, WETH) {
+  const args = [toAddress(bridge), toAddress(WETH)]
+  const contract = await deploy(web3, options, WETHOmnibridgeRouterABI, WETHOmnibridgeRouter.bytecode, args)
+  console.log(`Deployed WETHOmnibridgeRouter token ${contract.options.address}`)
+  return contract
 }
 
 const findMessageId = (receipt) =>
@@ -249,6 +263,10 @@ async function createEnv(web3Home, web3Foreign) {
   const homeBlockNumber = await web3Home.eth.getBlockNumber()
   const foreignBlockNumber = await web3Foreign.eth.getBlockNumber()
 
+  console.log('Initializing WETH stack')
+  const WETH = await deployWETH(web3Foreign, foreignOptions)
+  const WETHRouter = await deployWETHRouter(web3Foreign, foreignOptions, foreignMediator, WETH)
+
   return {
     home: {
       web3: web3Home,
@@ -275,6 +293,8 @@ async function createEnv(web3Home, web3Foreign) {
       waitUntilProcessed: makeWaitUntilProcessed(foreignAMB, 'RelayedMessage', foreignBlockNumber),
       withDisabledExecution: makeWithDisabledExecution(foreignMediator, owner),
       checkTransfer: makeCheckTransfer(web3Foreign),
+      WETH,
+      WETHRouter,
     },
     findMessageId,
     users,
