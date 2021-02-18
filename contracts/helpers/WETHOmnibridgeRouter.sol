@@ -3,13 +3,19 @@ pragma solidity 0.7.5;
 import "../interfaces/IOmnibridge.sol";
 import "../interfaces/IWETH.sol";
 import "../libraries/AddressHelper.sol";
+import "../upgradeable_contracts/modules/OwnableModule.sol";
+import "../upgradeable_contracts/Claimable.sol";
 
-contract WETHOmnibridgeRouter {
+contract WETHOmnibridgeRouter is OwnableModule, Claimable {
     IOmnibridge public immutable bridge;
     // solhint-disable-next-line var-name-mixedcase
     IWETH public immutable WETH;
 
-    constructor(IOmnibridge _bridge, IWETH _weth) {
+    constructor(
+        IOmnibridge _bridge,
+        IWETH _weth,
+        address _owner
+    ) OwnableModule(_owner) {
         bridge = _bridge;
         WETH = _weth;
         _weth.approve(address(_bridge), uint256(-1));
@@ -36,6 +42,10 @@ contract WETHOmnibridgeRouter {
             receiver := calldataload(120)
         }
         AddressHelper.safeSendValue(receiver, _value);
+    }
+
+    function claimTokens(address _token, address _to) external onlyOwner {
+        claimValues(_token, _to);
     }
 
     receive() external payable {

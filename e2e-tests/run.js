@@ -88,8 +88,8 @@ async function deployWETH(web3, options) {
   return contract
 }
 
-async function deployWETHRouter(web3, options, bridge, WETH) {
-  const args = [toAddress(bridge), toAddress(WETH)]
+async function deployWETHRouter(web3, options, bridge, WETH, owner) {
+  const args = [toAddress(bridge), toAddress(WETH), owner]
   const contract = await deploy(web3, options, WETHOmnibridgeRouterABI, WETHOmnibridgeRouter.bytecode, args)
   console.log(`Deployed WETHOmnibridgeRouter token ${contract.options.address}`)
   return contract
@@ -265,7 +265,7 @@ async function createEnv(web3Home, web3Foreign) {
 
   console.log('Initializing WETH stack')
   const WETH = await deployWETH(web3Foreign, foreignOptions)
-  const WETHRouter = await deployWETHRouter(web3Foreign, foreignOptions, foreignMediator, WETH)
+  const WETHRouter = await deployWETHRouter(web3Foreign, foreignOptions, foreignMediator, WETH, owner)
 
   return {
     home: {
