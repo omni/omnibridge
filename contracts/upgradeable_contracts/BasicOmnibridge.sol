@@ -171,6 +171,15 @@ abstract contract BasicOmnibridge is
     }
 
     /**
+     * @dev Checks if a given token is a bridged token that is native to this side of the bridge.
+     * @param _token address of token contract.
+     * @return message id of the send message.
+     */
+    function isRegisteredAsNativeToken(address _token) public view returns (bool) {
+        return nativeTokenAddress(_token) == address(0);
+    }
+
+    /**
      * @dev Unlock back the amount of tokens that were bridged to the other network but failed.
      * @param _token address that bridged token contract.
      * @param _recipient address that will receive the tokens.
@@ -181,7 +190,7 @@ abstract contract BasicOmnibridge is
         address _recipient,
         uint256 _value
     ) internal override {
-        _releaseTokens(nativeTokenAddress(_token) == address(0), _token, _recipient, _value, _value);
+        _releaseTokens(isRegisteredAsNativeToken(_token), _token, _recipient, _value, _value);
     }
 
     /**

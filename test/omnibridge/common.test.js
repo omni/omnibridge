@@ -463,6 +463,7 @@ function runTests(accounts, isHome) {
             const receiver = await send().should.be.fulfilled
 
             expect(await contract.maxAvailablePerTx(token.address)).to.be.bignumber.equal(value)
+            expect(await contract.isRegisteredAsNativeToken(token.address)).to.be.equal(true)
 
             await send(halfEther).should.be.fulfilled
 
@@ -1059,6 +1060,7 @@ function runTests(accounts, isHome) {
             expect(await contract.foreignTokenAddress(bridgedToken)).to.be.equal(nativeToken)
             expect(await contract.homeTokenAddress(nativeToken)).to.be.equal(bridgedToken)
           }
+          expect(await contract.isRegisteredAsNativeToken(bridgedToken)).to.be.equal(false)
           expect(await contract.totalExecutedPerDay(deployedToken.address, currentDay)).to.be.bignumber.equal(value)
           expect(await contract.mediatorBalance(deployedToken.address)).to.be.bignumber.equal(ZERO)
           expect(await deployedToken.balanceOf(user)).to.be.bignumber.equal(value)
