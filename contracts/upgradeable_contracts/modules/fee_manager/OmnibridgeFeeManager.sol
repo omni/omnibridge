@@ -236,7 +236,7 @@ contract OmnibridgeFeeManager is MediatorOwnableModule {
      * @param _addr address of the proposed reward receiver.
      * @return true, if address is valid.
      */
-    function _isValidAddress(address _addr) internal returns (bool) {
+    function _isValidAddress(address _addr) internal view returns (bool) {
         return _addr != address(0) && _addr != address(mediator);
     }
 }
