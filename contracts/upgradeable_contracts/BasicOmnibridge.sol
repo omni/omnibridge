@@ -143,7 +143,7 @@ abstract contract BasicOmnibridge is
         address _recipient,
         uint256 _value
     ) external onlyMediator {
-        require(isRegisteredAsNativeToken(_token));
+        _ackBridgedTokenDeploy(_token);
 
         _handleTokens(_token, true, _recipient, _value);
     }
@@ -163,7 +163,7 @@ abstract contract BasicOmnibridge is
         uint256 _value,
         bytes memory _data
     ) external onlyMediator {
-        require(isRegisteredAsNativeToken(_token));
+        _ackBridgedTokenDeploy(_token);
 
         _handleTokens(_token, true, _recipient, _value);
 
@@ -172,27 +172,16 @@ abstract contract BasicOmnibridge is
 
     /**
      * @dev Unlock back the amount of tokens that were bridged to the other network but failed.
-     * @param _messageId id of the failed message.
      * @param _token address that bridged token contract.
      * @param _recipient address that will receive the tokens.
      * @param _value amount of tokens to be received.
      */
     function executeActionOnFixedTokens(
-        bytes32 _messageId,
         address _token,
         address _recipient,
         uint256 _value
     ) internal override {
-        bytes32 registrationMessageId = tokenRegistrationMessageId(_token);
-        if (_messageId == registrationMessageId) {
-            delete uintStorage[keccak256(abi.encodePacked("dailyLimit", _token))];
-            delete uintStorage[keccak256(abi.encodePacked("maxPerTx", _token))];
-            delete uintStorage[keccak256(abi.encodePacked("minPerTx", _token))];
-            delete uintStorage[keccak256(abi.encodePacked("executionDailyLimit", _token))];
-            delete uintStorage[keccak256(abi.encodePacked("executionMaxPerTx", _token))];
-            _setTokenRegistrationMessageId(_token, bytes32(0));
-        }
-        _releaseTokens(registrationMessageId != bytes32(0), _token, _recipient, _value, _value);
+        _releaseTokens(nativeTokenAddress(_token) == address(0), _token, _recipient, _value, _value);
     }
 
     /**
@@ -223,7 +212,8 @@ abstract contract BasicOmnibridge is
         onlyIfUpgradeabilityOwner
         validAddress(_receiver)
     {
-        require(isRegisteredAsNativeToken(_token));
+        require(isBridgedTokenDeployAcknowledged(_token));
+
         uint256 balance = IERC677(_token).balanceOf(address(this));
         uint256 expectedBalance = mediatorBalance(_token);
         require(balance > expectedBalance);
@@ -240,7 +230,7 @@ abstract contract BasicOmnibridge is
 
         bytes32 _messageId =
             bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), data, requestGasLimit());
-        _recordBridgeOperation(false, _messageId, _token, _receiver, diff);
+        _recordBridgeOperation(_messageId, _token, _receiver, diff);
     }
 
     /**
@@ -273,14 +263,12 @@ abstract contract BasicOmnibridge is
     /**
      * @dev Internal function for recording bridge operation for further usage.
      * Recorded information is used for fixing failed requests on the other side.
-     * @param _register true, if native token is bridged for the first time.
      * @param _messageId id of the sent message.
      * @param _token bridged token address.
      * @param _sender address of the tokens sender.
      * @param _value bridged value.
      */
     function _recordBridgeOperation(
-        bool _register,
         bytes32 _messageId,
         address _token,
         address _sender,
@@ -290,26 +278,20 @@ abstract contract BasicOmnibridge is
         setMessageRecipient(_messageId, _sender);
         setMessageValue(_messageId, _value);
 
-        if (_register) {
-            _setTokenRegistrationMessageId(_token, _messageId);
-        }
-
         emit TokensBridgingInitiated(_token, _sender, _value, _messageId);
     }
 
     /**
      * @dev Constructs the message to be sent to the other side. Burns/locks bridged amount of tokens.
-     * @param _isKnownToken true, if token was already bridged previously.
-     * @param _isNativeToken true, if token is native to this side of the bridge.
+     * @param _nativeToken address of the native token contract.
      * @param _token bridged token address.
      * @param _receiver address of the tokens receiver on the other side.
      * @param _value bridged value.
-     * @param _decimals token decimals parameter, required only if _isKnownToken is false.
+     * @param _decimals token decimals parameter.
      * @param _data additional transfer data passed from the other side.
      */
     function _prepareMessage(
-        bool _isKnownToken,
-        bool _isNativeToken,
+        address _nativeToken,
         address _token,
         address _receiver,
         uint256 _value,
@@ -317,59 +299,65 @@ abstract contract BasicOmnibridge is
         bytes memory _data
     ) internal returns (bytes memory) {
         bool withData = _data.length > 0 || msg.sig == this.relayTokensAndCall.selector;
-        // process already known token that is native w.r.t. current chain
-        if (_isKnownToken && _isNativeToken) {
-            _setMediatorBalance(_token, mediatorBalance(_token).add(_value));
-            return
-                withData
-                    ? abi.encodeWithSelector(this.handleBridgedTokensAndCall.selector, _token, _receiver, _value, _data)
-                    : abi.encodeWithSelector(this.handleBridgedTokens.selector, _token, _receiver, _value);
-        }
 
-        // process already known token that is bridged from other chain
-        if (_isKnownToken) {
-            IBurnableMintableERC677Token(_token).burn(_value);
-            address nativeToken = nativeTokenAddress(_token);
+        // process token is native with respect to this side of the bridge
+        if (_nativeToken == address(0)) {
+            _setMediatorBalance(_token, mediatorBalance(_token).add(_value));
+
+            // process token which bridged alternative was already ACKed to be deployed
+            if (isBridgedTokenDeployAcknowledged(_token)) {
+                return
+                    withData
+                        ? abi.encodeWithSelector(
+                            this.handleBridgedTokensAndCall.selector,
+                            _token,
+                            _receiver,
+                            _value,
+                            _data
+                        )
+                        : abi.encodeWithSelector(this.handleBridgedTokens.selector, _token, _receiver, _value);
+            }
+
+            string memory name = TokenReader.readName(_token);
+            string memory symbol = TokenReader.readSymbol(_token);
+
+            require(bytes(name).length > 0 || bytes(symbol).length > 0);
+
             return
                 withData
                     ? abi.encodeWithSelector(
-                        this.handleNativeTokensAndCall.selector,
-                        nativeToken,
+                        this.deployAndHandleBridgedTokensAndCall.selector,
+                        _token,
+                        name,
+                        symbol,
+                        _decimals,
                         _receiver,
                         _value,
                         _data
                     )
-                    : abi.encodeWithSelector(this.handleNativeTokens.selector, nativeToken, _receiver, _value);
+                    : abi.encodeWithSelector(
+                        this.deployAndHandleBridgedTokens.selector,
+                        _token,
+                        name,
+                        symbol,
+                        _decimals,
+                        _receiver,
+                        _value
+                    );
         }
 
-        // process token that was not previously seen
-        string memory name = TokenReader.readName(_token);
-        string memory symbol = TokenReader.readSymbol(_token);
-
-        require(bytes(name).length > 0 || bytes(symbol).length > 0);
-
-        _setMediatorBalance(_token, _value);
+        // process already known token that is bridged from other chain
+        IBurnableMintableERC677Token(_token).burn(_value);
         return
             withData
                 ? abi.encodeWithSelector(
-                    this.deployAndHandleBridgedTokensAndCall.selector,
-                    _token,
-                    name,
-                    symbol,
-                    _decimals,
+                    this.handleNativeTokensAndCall.selector,
+                    _nativeToken,
                     _receiver,
                     _value,
                     _data
                 )
-                : abi.encodeWithSelector(
-                    this.deployAndHandleBridgedTokens.selector,
-                    _token,
-                    name,
-                    symbol,
-                    _decimals,
-                    _receiver,
-                    _value
-                );
+                : abi.encodeWithSelector(this.handleNativeTokens.selector, _nativeToken, _receiver, _value);
     }
 
     /**
