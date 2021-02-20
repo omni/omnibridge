@@ -646,7 +646,7 @@ function runTests(accounts, isHome) {
       })
 
       describe('tokens relay', () => {
-        for (const send of sendFunctions.slice(0, 1)) {
+        for (const send of sendFunctions) {
           it(`should make calls to deployAndHandleBridgedTokens and handleBridgedTokens using ${send.name}`, async () => {
             const receiver = await send().should.be.fulfilled
 
