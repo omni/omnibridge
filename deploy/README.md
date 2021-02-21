@@ -92,6 +92,9 @@ HOME_AMB_BRIDGE=0x
 # to the Home network.
 FOREIGN_AMB_BRIDGE=0x
 # The gas limit that will be used in the execution of the message passed to the mediator contract
+# in the Foreign network.
+HOME_MEDIATOR_REQUEST_GAS_LIMIT=2000000
+# The gas limit that will be used in the execution of the message passed to the mediator contract
 # in the Home network.
 FOREIGN_MEDIATOR_REQUEST_GAS_LIMIT=2000000
 

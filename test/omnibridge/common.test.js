@@ -414,7 +414,7 @@ function runTests(accounts, isHome) {
         describe('gas limit manager', () => {
           let manager
           beforeEach(async () => {
-            manager = await SelectorTokenGasLimitManager.new(ambBridgeContract.address, owner)
+            manager = await SelectorTokenGasLimitManager.new(ambBridgeContract.address, owner, 1000000)
           })
 
           it('should allow to set new manager', async () => {

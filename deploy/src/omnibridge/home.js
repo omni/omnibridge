@@ -10,6 +10,7 @@ const {
   FOREIGN_TRANSACTIONS_FEE,
   HOME_MEDIATOR_REWARD_ACCOUNTS,
   HOME_AMB_BRIDGE,
+  HOME_MEDIATOR_REQUEST_GAS_LIMIT,
 } = require('../loadEnv')
 const { ZERO_ADDRESS } = require('../constants')
 
@@ -78,9 +79,11 @@ async function deployHome() {
     HOME_AMB_BRIDGE: ${HOME_AMB_BRIDGE}
     OWNER: ${HOME_BRIDGE_OWNER}
   `)
-  const gasLimitManager = await deployContract(SelectorTokenGasLimitManager, [HOME_AMB_BRIDGE, HOME_BRIDGE_OWNER], {
-    nonce: nonce++,
-  })
+  const gasLimitManager = await deployContract(
+    SelectorTokenGasLimitManager,
+    [HOME_AMB_BRIDGE, HOME_BRIDGE_OWNER, HOME_MEDIATOR_REQUEST_GAS_LIMIT],
+    { nonce: nonce++ }
+  )
   console.log('\n[Home] New Gas Limit Manager has been deployed: ', gasLimitManager.options.address)
   console.log('[Home] Manual setup of request gas limits in the manager is recommended.')
   console.log('[Home] Please, call setCommonRequestGasLimits on the Gas Limit Manager contract.')

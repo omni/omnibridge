@@ -15,9 +15,14 @@ contract SelectorTokenGasLimitManager is OwnableModule {
     mapping(bytes4 => uint256) internal selectorGasLimit;
     mapping(bytes4 => mapping(address => uint256)) internal selectorTokenGasLimit;
 
-    constructor(IAMB _bridge, address _owner) OwnableModule(_owner) {
+    constructor(
+        IAMB _bridge,
+        address _owner,
+        uint256 _gasLimit
+    ) OwnableModule(_owner) {
+        require(_gasLimit <= _bridge.maxGasPerTx());
         bridge = _bridge;
-        defaultGasLimit = _bridge.maxGasPerTx();
+        defaultGasLimit = _gasLimit;
     }
 
     /**
