@@ -96,25 +96,21 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager {
         uint256 _value,
         bytes memory _data
     ) internal virtual override {
-        require(_receiver != address(0));
-        require(_receiver != mediatorContractOnOtherSide());
+        require(_receiver != address(0) && _receiver != mediatorContractOnOtherSide());
 
-        uint8 decimals;
-        bool isKnownToken = isTokenRegistered(_token);
-        bool isNativeToken = !isKnownToken || isRegisteredAsNativeToken(_token);
+        uint8 decimals = uint8(TokenReader.readDecimals(_token));
 
         // native unbridged token
-        if (!isKnownToken) {
-            decimals = uint8(TokenReader.readDecimals(_token));
+        if (!isTokenRegistered(_token)) {
             _initializeTokenBridgeLimits(_token, decimals);
         }
 
         require(withinLimit(_token, _value));
         addTotalSpentPerDay(_token, getCurrentDay(), _value);
 
-        bytes memory data = _prepareMessage(isKnownToken, isNativeToken, _token, _receiver, _value, decimals, _data);
+        bytes memory data = _prepareMessage(nativeTokenAddress(_token), _token, _receiver, _value, decimals, _data);
         bytes32 _messageId = _passMessage(data, true);
-        _recordBridgeOperation(!isKnownToken, _messageId, _token, _from, _value);
+        _recordBridgeOperation(_messageId, _token, _from, _value);
     }
 
     /**
