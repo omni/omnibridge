@@ -22,9 +22,9 @@ cp .env.example .env
 
 6. Run `npm run deploy`.
 
-## `MULTI-AMB-ERC-TO-ERC` Bridge Mode Configuration Example.
+## `OMNIBRIDGE` Bridge Mode Configuration Example.
 
-This example of an `.env` file for the `MULTI-AMB-ERC-TO-ERC` bridge mode includes comments describing each parameter.
+This example of an `.env` file for the `OMNIBRIDGE` bridge mode includes comments describing each parameter.
 
 ```bash
 # The type of bridge. Defines set of contracts to be deployed.
@@ -91,9 +91,6 @@ HOME_AMB_BRIDGE=0x
 # The address of the existing AMB bridge in the Foreign network that will be used to pass messages
 # to the Home network.
 FOREIGN_AMB_BRIDGE=0x
-# The gas limit that will be used in the execution of the message passed to the mediator contract
-# in the Foreign network.
-HOME_MEDIATOR_REQUEST_GAS_LIMIT=2000000
 # The gas limit that will be used in the execution of the message passed to the mediator contract
 # in the Home network.
 FOREIGN_MEDIATOR_REQUEST_GAS_LIMIT=2000000

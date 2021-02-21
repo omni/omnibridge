@@ -65,7 +65,6 @@ switch (BRIDGE_MODE) {
       ...validations,
       HOME_AMB_BRIDGE: addressValidator(),
       FOREIGN_AMB_BRIDGE: addressValidator(),
-      HOME_MEDIATOR_REQUEST_GAS_LIMIT: bigNumValidator(),
       FOREIGN_MEDIATOR_REQUEST_GAS_LIMIT: bigNumValidator(),
       FOREIGN_MIN_AMOUNT_PER_TX: bigNumValidator(),
       FOREIGN_MAX_AMOUNT_PER_TX: bigNumValidator(),
