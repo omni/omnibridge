@@ -8,10 +8,9 @@ import "@openzeppelin/contracts/utils/Address.sol";
  * @title BasicAMBMediator
  * @dev Basic storage and methods needed by mediators to interact with AMB bridge.
  */
-contract BasicAMBMediator is Ownable {
+abstract contract BasicAMBMediator is Ownable {
     bytes32 internal constant BRIDGE_CONTRACT = 0x811bbb11e8899da471f0e69a3ed55090fc90215227fc5fb1cb0d6e962ea7b74f; // keccak256(abi.encodePacked("bridgeContract"))
     bytes32 internal constant MEDIATOR_CONTRACT = 0x98aa806e31e94a687a31c65769cb99670064dd7f5a87526da075c5fb4eab9880; // keccak256(abi.encodePacked("mediatorContract"))
-    bytes32 internal constant REQUEST_GAS_LIMIT = 0x2dfd6c9f781bb6bbb5369c114e949b69ebb440ef3d4dd6b2836225eb1dc3a2be; // keccak256(abi.encodePacked("requestGasLimit"))
 
     /**
      * @dev Throws if caller on the other side is not an associated mediator.
@@ -25,8 +24,9 @@ contract BasicAMBMediator is Ownable {
      * @dev Internal function for reducing onlyMediator modifier bytecode overhead.
      */
     function _onlyMediator() internal view {
-        require(msg.sender == address(bridgeContract()));
-        require(messageSender() == mediatorContractOnOtherSide());
+        IAMB bridge = bridgeContract();
+        require(msg.sender == address(bridge));
+        require(bridge.messageSender() == mediatorContractOnOtherSide());
     }
 
     /**
@@ -46,16 +46,6 @@ contract BasicAMBMediator is Ownable {
     }
 
     /**
-     * @dev Sets the gas limit to be used in the message execution by the AMB bridge on the other network.
-     * This value can't exceed the parameter maxGasPerTx defined on the AMB bridge.
-     * Only the owner can call this method.
-     * @param _requestGasLimit the gas limit for the message execution.
-     */
-    function setRequestGasLimit(uint256 _requestGasLimit) external onlyOwner {
-        _setRequestGasLimit(_requestGasLimit);
-    }
-
-    /**
      * @dev Get the AMB interface for the bridge contract address
      * @return AMB interface for the bridge contract address
      */
@@ -69,14 +59,6 @@ contract BasicAMBMediator is Ownable {
      */
     function mediatorContractOnOtherSide() public view virtual returns (address) {
         return addressStorage[MEDIATOR_CONTRACT];
-    }
-
-    /**
-     * @dev Tells the gas limit to be used in the message execution by the AMB bridge on the other network.
-     * @return the gas limit for the message execution.
-     */
-    function requestGasLimit() public view returns (uint256) {
-        return uintStorage[REQUEST_GAS_LIMIT];
     }
 
     /**
@@ -97,24 +79,6 @@ contract BasicAMBMediator is Ownable {
     }
 
     /**
-     * @dev Stores the gas limit to be used in the message execution by the AMB bridge on the other network.
-     * @param _requestGasLimit the gas limit for the message execution.
-     */
-    function _setRequestGasLimit(uint256 _requestGasLimit) internal {
-        require(_requestGasLimit <= maxGasPerTx());
-        uintStorage[REQUEST_GAS_LIMIT] = _requestGasLimit;
-    }
-
-    /**
-     * @dev Tells the address that generated the message on the other network that is currently being executed by
-     * the AMB bridge.
-     * @return the address of the message sender.
-     */
-    function messageSender() internal view returns (address) {
-        return bridgeContract().messageSender();
-    }
-
-    /**
      * @dev Tells the id of the message originated on the other network.
      * @return the id of the message originated on the other network.
      */
@@ -129,4 +93,8 @@ contract BasicAMBMediator is Ownable {
     function maxGasPerTx() internal view returns (uint256) {
         return bridgeContract().maxGasPerTx();
     }
+
+    function _passMessage(bytes memory _data, bool _useOracleLane) internal virtual returns (bytes32);
+
+    function _chooseRequestGasLimit(bytes memory _data) internal view virtual returns (uint256);
 }

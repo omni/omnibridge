@@ -1,13 +1,14 @@
 pragma solidity 0.7.5;
 
 import "./BasicOmnibridge.sol";
+import "./components/common/GasLimitManager.sol";
 
 /**
  * @title ForeignOmnibridge
  * @dev Foreign side implementation for multi-token mediator intended to work on top of AMB bridge.
  * It is designed to be used as an implementation contract of EternalStorageProxy contract.
  */
-contract ForeignOmnibridge is BasicOmnibridge {
+contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager {
     using SafeERC20 for IERC677;
     using SafeMath for uint256;
 
@@ -95,26 +96,21 @@ contract ForeignOmnibridge is BasicOmnibridge {
         uint256 _value,
         bytes memory _data
     ) internal virtual override {
-        require(_receiver != address(0));
-        require(_receiver != mediatorContractOnOtherSide());
+        require(_receiver != address(0) && _receiver != mediatorContractOnOtherSide());
 
-        uint8 decimals;
-        bool isKnownToken = isTokenRegistered(_token);
-        bool isNativeToken = !isKnownToken || isRegisteredAsNativeToken(_token);
+        uint8 decimals = uint8(TokenReader.readDecimals(_token));
 
         // native unbridged token
-        if (!isKnownToken) {
-            decimals = uint8(TokenReader.readDecimals(_token));
+        if (!isTokenRegistered(_token)) {
             _initializeTokenBridgeLimits(_token, decimals);
         }
 
         require(withinLimit(_token, _value));
         addTotalSpentPerDay(_token, getCurrentDay(), _value);
 
-        bytes memory data = _prepareMessage(isKnownToken, isNativeToken, _token, _receiver, _value, decimals, _data);
-        bytes32 _messageId =
-            bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), data, requestGasLimit());
-        _recordBridgeOperation(!isKnownToken, _messageId, _token, _from, _value);
+        bytes memory data = _prepareMessage(nativeTokenAddress(_token), _token, _receiver, _value, decimals, _data);
+        bytes32 _messageId = _passMessage(data, true);
+        _recordBridgeOperation(_messageId, _token, _from, _value);
     }
 
     /**
@@ -152,5 +148,18 @@ contract ForeignOmnibridge is BasicOmnibridge {
      */
     function _transformName(string memory _name) internal pure override returns (string memory) {
         return string(abi.encodePacked(_name, " on Mainnet"));
+    }
+
+    /**
+     * @dev Internal function for sending an AMB message to the mediator on the other side.
+     * @param _data data to be sent to the other side of the bridge.
+     * @param _useOracleLane always true, not used on this side of the bridge.
+     * @return id of the sent message.
+     */
+    function _passMessage(bytes memory _data, bool _useOracleLane) internal override returns (bytes32) {
+        (_useOracleLane);
+        uint256 gasLimit = _chooseRequestGasLimit(_data);
+
+        return bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), _data, gasLimit);
     }
 }

@@ -15,7 +15,7 @@ contract MediatorOwnableModule is OwnableModule {
      * @param _mediator address of the deployed Omnibridge extension for which this module is deployed.
      * @param _owner address of the owner that is allowed to perform additional actions on the particular module.
      */
-    constructor(address _mediator, address _owner) public OwnableModule(_owner) {
+    constructor(address _mediator, address _owner) OwnableModule(_owner) {
         require(Address.isContract(_mediator));
         mediator = _mediator;
     }
