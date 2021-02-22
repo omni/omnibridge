@@ -18,13 +18,22 @@ async function deployOmnibridge() {
   const initializeHome = require('./src/omnibridge/initializeHome')
   const initializeForeign = require('./src/omnibridge/initializeForeign')
   await preDeploy()
-  const { homeBridgeMediator, tokenFactory: homeTokenFactory } = await deployHome()
+  const {
+    homeBridgeMediator,
+    tokenFactory: homeTokenFactory,
+    feeManager,
+    gasLimitManager,
+    forwardingRulesManager,
+  } = await deployHome()
   const { foreignBridgeMediator, tokenFactory: foreignTokenFactory } = await deployForeign()
 
   await initializeHome({
     homeBridge: homeBridgeMediator.address,
     foreignBridge: foreignBridgeMediator.address,
     tokenFactory: homeTokenFactory.address,
+    feeManager: feeManager.address,
+    gasLimitManager: gasLimitManager.address,
+    forwardingRulesManager: forwardingRulesManager.address,
   })
 
   await initializeForeign({
@@ -58,4 +67,7 @@ async function main() {
   }
 }
 
-main().catch((e) => console.log('Error:', e))
+main().catch((e) => {
+  console.log('Error:', e)
+  process.exit(1)
+})

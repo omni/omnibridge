@@ -22,7 +22,7 @@ abstract contract FailedMessagesProcessor is BasicAMBMediator, BridgeOperationsS
 
         bytes4 methodSelector = this.fixFailedMessage.selector;
         bytes memory data = abi.encodeWithSelector(methodSelector, _messageId);
-        bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), data, requestGasLimit());
+        _passMessage(data, true);
     }
 
     /**
@@ -37,7 +37,7 @@ abstract contract FailedMessagesProcessor is BasicAMBMediator, BridgeOperationsS
         address recipient = messageRecipient(_messageId);
         uint256 value = messageValue(_messageId);
         setMessageFixed(_messageId);
-        executeActionOnFixedTokens(_messageId, token, recipient, value);
+        executeActionOnFixedTokens(token, recipient, value);
         emit FailedMessageFixed(_messageId, token, recipient, value);
     }
 
@@ -58,7 +58,6 @@ abstract contract FailedMessagesProcessor is BasicAMBMediator, BridgeOperationsS
     }
 
     function executeActionOnFixedTokens(
-        bytes32 _messageId,
         address _token,
         address _recipient,
         uint256 _value

@@ -22,9 +22,9 @@ cp .env.example .env
 
 6. Run `npm run deploy`.
 
-## `MULTI-AMB-ERC-TO-ERC` Bridge Mode Configuration Example.
+## `OMNIBRIDGE` Bridge Mode Configuration Example.
 
-This example of an `.env` file for the `MULTI-AMB-ERC-TO-ERC` bridge mode includes comments describing each parameter.
+This example of an `.env` file for the `OMNIBRIDGE` bridge mode includes comments describing each parameter.
 
 ```bash
 # The type of bridge. Defines set of contracts to be deployed.
@@ -124,6 +124,10 @@ HOME_ERC677_TOKEN_IMAGE=
 # address of an already deployed TokenFactory contract for creating new bridged tokens on the Home side.
 # leave empty, if you want to deploy a new TokenFactory
 HOME_TOKEN_FACTORY=
+# address of an already deployed MultiTokenForwardingRulesManager contract for managing AMB lane permissions.
+# leave empty, if you want to deploy a new MultiTokenForwardingRulesManager.
+# put false, if you want to do not use lane permissions.
+HOME_FORWARDING_RULES_MANAGER=
 
 # address of an already deployed PermittableToken contract that will be used as an implementation for all bridged tokens on the Foreign side
 # leave empty, if you want to deploy a new PermittableToken for further usage

@@ -1,13 +1,14 @@
 pragma solidity 0.7.5;
 
 import "./BasicOmnibridge.sol";
+import "./components/common/GasLimitManager.sol";
 
 /**
  * @title ForeignOmnibridge
  * @dev Foreign side implementation for multi-token mediator intended to work on top of AMB bridge.
  * It is designed to be used as an implementation contract of EternalStorageProxy contract.
  */
-contract ForeignOmnibridge is BasicOmnibridge {
+contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager {
     using SafeERC20 for IERC677;
     using SafeMath for uint256;
 
@@ -75,11 +76,7 @@ contract ForeignOmnibridge is BasicOmnibridge {
         require(withinExecutionLimit(_token, _value));
         addTotalExecutedPerDay(_token, getCurrentDay(), _value);
 
-        if (_isNative) {
-            _releaseTokens(_token, _recipient, _value);
-        } else {
-            _getMinterFor(_token).mint(_recipient, _value);
-        }
+        _releaseTokens(_isNative, _token, _recipient, _value, _value);
 
         emit TokensBridged(_token, _recipient, _value, messageId());
     }
@@ -90,62 +87,58 @@ contract ForeignOmnibridge is BasicOmnibridge {
      * @param _from address of tokens sender
      * @param _receiver address of tokens receiver on the other side
      * @param _value requested amount of bridged tokens
+     * @param _data additional transfer data to be used on the other side
      */
     function bridgeSpecificActionsOnTokenTransfer(
         address _token,
         address _from,
         address _receiver,
-        uint256 _value
+        uint256 _value,
+        bytes memory _data
     ) internal virtual override {
-        uint8 decimals;
-        bool isKnownToken = isTokenRegistered(_token);
-        bool isNativeToken = !isKnownToken || isRegisteredAsNativeToken(_token);
+        require(_receiver != address(0) && _receiver != mediatorContractOnOtherSide());
+
+        uint8 decimals = uint8(TokenReader.readDecimals(_token));
 
         // native unbridged token
-        if (!isKnownToken) {
-            decimals = uint8(TokenReader.readDecimals(_token));
-            _initToken(_token, decimals);
+        if (!isTokenRegistered(_token)) {
+            _initializeTokenBridgeLimits(_token, decimals);
         }
 
         require(withinLimit(_token, _value));
         addTotalSpentPerDay(_token, getCurrentDay(), _value);
 
-        bytes memory data = _prepareMessage(isKnownToken, isNativeToken, _token, _receiver, _value, decimals);
-        bytes32 _messageId =
-            bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), data, requestGasLimit());
-        _recordBridgeOperation(!isKnownToken, _messageId, _token, _from, _value);
+        bytes memory data = _prepareMessage(nativeTokenAddress(_token), _token, _receiver, _value, decimals, _data);
+        bytes32 _messageId = _passMessage(data, true);
+        _recordBridgeOperation(_messageId, _token, _from, _value);
     }
 
     /**
      * Internal function for unlocking some amount of tokens.
-     * When bridging STAKE token, the insufficient amount of tokens can be additionally minted.
+     * @param _isNative true, if token is native w.r.t. to this side of the bridge.
      * @param _token address of the token contract.
      * @param _recipient address of the tokens receiver.
      * @param _value amount of tokens to unlock.
+     * @param _balanceChange amount of balance to subtract from the mediator balance.
      */
     function _releaseTokens(
+        bool _isNative,
         address _token,
         address _recipient,
-        uint256 _value
+        uint256 _value,
+        uint256 _balanceChange
     ) internal override {
-        uint256 balance = mediatorBalance(_token);
-
-        // STAKE total supply on xDai can be higher than the native STAKE supply on Mainnet
-        // Omnibridge is allowed to mint extra native STAKE tokens.
-        if (_token == address(0x0Ae055097C6d159879521C384F1D2123D1f195e6) && balance < _value) {
-            // if all locked tokens were already withdrawn, mint new tokens directly to receiver
-            // mediatorBalance(STAKE) remains 0 in this case.
-            if (balance == 0) {
-                IBurnableMintableERC677Token(_token).mint(_recipient, _value);
-                return;
+        if (_isNative) {
+            uint256 balance = mediatorBalance(_token);
+            if (_token == address(0x0Ae055097C6d159879521C384F1D2123D1f195e6) && balance < _value) {
+                IBurnableMintableERC677Token(_token).mint(address(this), _value - balance);
+                balance = _value;
             }
-
-            // otherwise, first mint insufficient tokens to the contract
-            IBurnableMintableERC677Token(_token).mint(address(this), _value - balance);
-            balance = _value;
+            _setMediatorBalance(_token, balance.sub(_balanceChange));
+            IERC677(_token).safeTransfer(_recipient, _value);
+        } else {
+            _getMinterFor(_token).mint(_recipient, _value);
         }
-        IERC677(_token).safeTransfer(_recipient, _value);
-        _setMediatorBalance(_token, balance.sub(_value));
     }
 
     /**
@@ -155,5 +148,18 @@ contract ForeignOmnibridge is BasicOmnibridge {
      */
     function _transformName(string memory _name) internal pure override returns (string memory) {
         return string(abi.encodePacked(_name, " on Mainnet"));
+    }
+
+    /**
+     * @dev Internal function for sending an AMB message to the mediator on the other side.
+     * @param _data data to be sent to the other side of the bridge.
+     * @param _useOracleLane always true, not used on this side of the bridge.
+     * @return id of the sent message.
+     */
+    function _passMessage(bytes memory _data, bool _useOracleLane) internal override returns (bytes32) {
+        (_useOracleLane);
+        uint256 gasLimit = _chooseRequestGasLimit(_data);
+
+        return bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), _data, gasLimit);
     }
 }

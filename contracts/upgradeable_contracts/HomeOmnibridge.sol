@@ -1,15 +1,21 @@
 pragma solidity 0.7.5;
 
 import "./BasicOmnibridge.sol";
-import "./HomeOmnibridgeFeeManager.sol";
 import "./modules/forwarding_rules/MultiTokenForwardingRulesConnector.sol";
+import "./modules/fee_manager/OmnibridgeFeeManagerConnector.sol";
+import "./modules/gas_limit/SelectorTokenGasLimitConnector.sol";
 
 /**
  * @title HomeOmnibridge
  * @dev Home side implementation for multi-token mediator intended to work on top of AMB bridge.
  * It is designed to be used as an implementation contract of EternalStorageProxy contract.
  */
-contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiTokenForwardingRulesConnector {
+contract HomeOmnibridge is
+    BasicOmnibridge,
+    SelectorTokenGasLimitConnector,
+    OmnibridgeFeeManagerConnector,
+    MultiTokenForwardingRulesConnector
+{
     using SafeMath for uint256;
     using SafeERC20 for IERC677;
 
@@ -21,23 +27,22 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
      *   [ 0 = dailyLimit, 1 = maxPerTx, 2 = minPerTx ]
      * @param _executionDailyLimitExecutionMaxPerTxArray array with limit values for the assets bridged from the other network.
      *   [ 0 = executionDailyLimit, 1 = executionMaxPerTx ]
-     * @param _requestGasLimit the gas limit for the message execution.
+     * @param _gasLimitManager the gas limit manager contract address.
      * @param _owner address of the owner of the mediator contract.
      * @param _tokenFactory address of the TokenFactory contract that will be used for the deployment of new tokens.
-     * @param _rewardAddresses list of reward addresses, between whom fees will be distributed.
-     * @param _fees array with initial fees for both bridge directions.
-     *   [ 0 = homeToForeignFee, 1 = foreignToHomeFee ]
+     * @param _feeManager address of the OmnibridgeFeeManager contract that will be used for fee distribution.
+     * @param _forwardingRulesManager address of the MultiTokenForwardingRulesManager contract that will be used for managing lane permissions.
      */
     function initialize(
         address _bridgeContract,
         address _mediatorContract,
         uint256[3] calldata _dailyLimitMaxPerTxMinPerTxArray, // [ 0 = _dailyLimit, 1 = _maxPerTx, 2 = _minPerTx ]
         uint256[2] calldata _executionDailyLimitExecutionMaxPerTxArray, // [ 0 = _executionDailyLimit, 1 = _executionMaxPerTx ]
-        uint256 _requestGasLimit,
+        address _gasLimitManager,
         address _owner,
         address _tokenFactory,
-        address[] calldata _rewardAddresses,
-        uint256[2] calldata _fees // [ 0 = homeToForeignFee, 1 = foreignToHomeFee ]
+        address _feeManager,
+        address _forwardingRulesManager
     ) external onlyRelevantSender returns (bool) {
         require(!isInitialized());
 
@@ -45,14 +50,11 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
         _setMediatorContractOnOtherSide(_mediatorContract);
         _setLimits(address(0), _dailyLimitMaxPerTxMinPerTxArray);
         _setExecutionLimits(address(0), _executionDailyLimitExecutionMaxPerTxArray);
-        _setRequestGasLimit(_requestGasLimit);
+        _setGasLimitManager(_gasLimitManager);
         _setOwner(_owner);
         _setTokenFactory(_tokenFactory);
-        if (_rewardAddresses.length > 0) {
-            _setRewardAddressList(_rewardAddresses);
-        }
-        _setFee(HOME_TO_FOREIGN_FEE, address(0), _fees[0]);
-        _setFee(FOREIGN_TO_HOME_FEE, address(0), _fees[1]);
+        _setFeeManager(_feeManager);
+        _setForwardingRulesManager(_forwardingRulesManager);
 
         setInitialize();
 
@@ -64,17 +66,20 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
      * Sets the token factory contract. Resumes token bridging in the home to foreign direction.
      * @param _tokenFactory address of the deployed TokenFactory contract.
      * @param _forwardingRulesManager address of the deployed MultiTokenForwardingRulesManager contract.
+     * @param _gasLimitManager address of the deployed SelectorTokenGasLimitManager contract.
      * @param _dailyLimit default daily limits used before stopping the bridge operation.
      */
     function upgradeToReverseMode(
         address _tokenFactory,
         address _forwardingRulesManager,
+        address _gasLimitManager,
         uint256 _dailyLimit
     ) external {
         require(msg.sender == address(this));
 
         _setTokenFactory(_tokenFactory);
         _setForwardingRulesManager(_forwardingRulesManager);
+        _setGasLimitManager(_gasLimitManager);
 
         uintStorage[keccak256(abi.encodePacked("dailyLimit", address(0)))] = _dailyLimit;
         emit DailyLimitChanged(address(0), _dailyLimit);
@@ -99,18 +104,6 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
     }
 
     /**
-     * @dev One-time upgrade function for transferring ownership of the STAKE token to the TokenMinter address.
-     * Should be called together with upgradeToAndCall function
-     */
-    function transferTokenOwnership() external {
-        require(msg.sender == address(this));
-
-        Ownable(0xb7D311E2Eb55F2f68a9440da38e7989210b9A05e).transferOwnership(
-            0x1111111111111111111111111111111111111111
-        );
-    }
-
-    /**
      * @dev Handles the bridged tokens.
      * Checks that the value is inside the execution limits and invokes the Mint or Unlock accordingly.
      * @param _token token contract address on this side of the bridge.
@@ -128,20 +121,14 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
         addTotalExecutedPerDay(_token, getCurrentDay(), _value);
 
         uint256 valueToBridge = _value;
-        uint256 fee = _distributeFee(FOREIGN_TO_HOME_FEE, _isNative, _token, valueToBridge);
+        uint256 fee = _distributeFee(FOREIGN_TO_HOME_FEE, _isNative, address(0), _token, valueToBridge);
         bytes32 _messageId = messageId();
         if (fee > 0) {
             emit FeeDistributed(fee, _token, _messageId);
             valueToBridge = valueToBridge.sub(fee);
         }
 
-        if (_isNative) {
-            // not _releaseTokens(_token, _recipient, _value), since valueToBridge < _value
-            IERC677(_token).safeTransfer(_recipient, valueToBridge);
-            _setMediatorBalance(_token, mediatorBalance(_token).sub(_value));
-        } else {
-            _getMinterFor(_token).mint(_recipient, valueToBridge);
-        }
+        _releaseTokens(_isNative, _token, _recipient, valueToBridge, _value);
 
         emit TokensBridged(_token, _recipient, valueToBridge, _messageId);
     }
@@ -152,81 +139,56 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
      * @param _from address of tokens sender
      * @param _receiver address of tokens receiver on the other side
      * @param _value requested amount of bridged tokens
+     * @param _data additional transfer data to be used on the other side
      */
     function bridgeSpecificActionsOnTokenTransfer(
         address _token,
         address _from,
         address _receiver,
-        uint256 _value
+        uint256 _value,
+        bytes memory _data
     ) internal override {
-        uint8 decimals;
-        bool isKnownToken = isTokenRegistered(_token);
-        bool isNativeToken = !isKnownToken || isRegisteredAsNativeToken(_token);
+        require(_receiver != address(0) && _receiver != mediatorContractOnOtherSide());
+
+        uint8 decimals = uint8(TokenReader.readDecimals(_token));
+        address nativeToken = nativeTokenAddress(_token);
 
         // native unbridged token
-        if (!isKnownToken) {
-            decimals = uint8(TokenReader.readDecimals(_token));
-            _initToken(_token, decimals);
+        if (!isTokenRegistered(_token)) {
+            _initializeTokenBridgeLimits(_token, decimals);
         }
 
         require(withinLimit(_token, _value));
         addTotalSpentPerDay(_token, getCurrentDay(), _value);
 
-        uint256 valueToBridge = _value;
-        uint256 fee = 0;
-        // Next line disables fee collection in case sender is one of the reward addresses.
-        // It is needed to allow a 100% withdrawal of tokens from the home side.
-        // If fees are not disabled for reward receivers, small fraction of tokens will always
-        // be redistributed between the same set of reward addresses, which is not the desired behaviour.
-        if (!isRewardAddress(_from)) {
-            fee = _distributeFee(HOME_TO_FOREIGN_FEE, isNativeToken, _token, valueToBridge);
-            valueToBridge = valueToBridge.sub(fee);
-        }
+        uint256 fee = _distributeFee(HOME_TO_FOREIGN_FEE, nativeToken == address(0), _from, _token, _value);
+        uint256 valueToBridge = _value.sub(fee);
 
-        bytes memory data = _prepareMessage(isKnownToken, isNativeToken, _token, _receiver, valueToBridge, decimals);
+        bytes memory data = _prepareMessage(nativeToken, _token, _receiver, valueToBridge, decimals, _data);
 
-        bytes32 _messageId = _passMessage(data, _token, _from, _receiver);
-        _recordBridgeOperation(!isKnownToken, _messageId, _token, _from, valueToBridge);
+        // Address of the home token is used here for determining lane permissions.
+        bytes32 _messageId = _passMessage(data, _isOracleDrivenLaneAllowed(_token, _from, _receiver));
+        _recordBridgeOperation(_messageId, _token, _from, valueToBridge);
         if (fee > 0) {
             emit FeeDistributed(fee, _token, _messageId);
         }
     }
 
     /**
-     * @dev Internal function for sending an AMB message.
-     * Takes into account forwarding rules from forwardingRulesManager().
+     * @dev Internal function for sending an AMB message to the mediator on the other side.
      * @param _data data to be sent to the other side of the bridge.
-     * @param _token address of the home token contract within the bridged pair.
-     * @param _from address of the tokens sender.
-     * @param _receiver address of the tokens receiver on the other side.
+     * @param _useOracleLane true, if the message should be sent to the oracle driven lane.
      * @return id of the sent message.
      */
-    function _passMessage(
-        bytes memory _data,
-        address _token,
-        address _from,
-        address _receiver
-    ) internal returns (bytes32) {
+    function _passMessage(bytes memory _data, bool _useOracleLane) internal override returns (bytes32) {
         address executor = mediatorContractOnOtherSide();
-        uint256 gasLimit = requestGasLimit();
+        uint256 gasLimit = _chooseRequestGasLimit(_data);
         IAMB bridge = bridgeContract();
 
-        // Address of the home token is used here for determining lane permissions.
         return
-            _isOracleDrivenLaneAllowed(_token, _from, _receiver)
+            _useOracleLane
                 ? bridge.requireToPassMessage(executor, _data, gasLimit)
                 : bridge.requireToConfirmMessage(executor, _data, gasLimit);
-    }
-
-    /**
-     * @dev Internal function for initializing newly bridged token related information.
-     * @param _token address of the token contract.
-     * @param _decimals token decimals parameter.
-     */
-    function _initToken(address _token, uint8 _decimals) internal override {
-        super._initToken(_token, _decimals);
-        _setFee(HOME_TO_FOREIGN_FEE, _token, getFee(HOME_TO_FOREIGN_FEE, address(0)));
-        _setFee(FOREIGN_TO_HOME_FEE, _token, getFee(FOREIGN_TO_HOME_FEE, address(0)));
     }
 
     /**
@@ -247,8 +209,8 @@ contract HomeOmnibridge is BasicOmnibridge, HomeOmnibridgeFeeManager, MultiToken
      */
     function _getMinterFor(address _token)
         internal
-        view
-        override(BasicOmnibridge, HomeOmnibridgeFeeManager)
+        pure
+        override(BasicOmnibridge, OmnibridgeFeeManagerConnector)
         returns (IBurnableMintableERC677Token)
     {
         if (_token == address(0xb7D311E2Eb55F2f68a9440da38e7989210b9A05e)) {
