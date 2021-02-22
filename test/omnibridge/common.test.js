@@ -83,6 +83,7 @@ function runTests(accounts, isHome) {
     ]
     if (isHome) {
       args.push(opts.feeManager || ZERO_ADDRESS)
+      args.push(opts.forwardingRulesManager || ZERO_ADDRESS)
     }
     return contract.initialize(...args)
   }
@@ -253,6 +254,12 @@ function runTests(accounts, isHome) {
       if (isHome) {
         // gas limit manage is not a contract
         await initialize({ gasLimitManager: owner }).should.be.rejected
+
+        // fee manager is not a contract
+        await initialize({ feeManager: owner }).should.be.rejected
+
+        // forwarding rules manager is not a contract
+        await initialize({ forwardingRulesManager: owner }).should.be.rejected
       } else {
         // maxGasPerTx > bridge maxGasPerTx
         await initialize({ requestGasLimit: ether('1') }).should.be.rejected

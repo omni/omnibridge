@@ -28,6 +28,7 @@ async function initializeMediator({
     tokenFactory,
     feeManager,
     gasLimitManager,
+    forwardingRulesManager,
   },
 }) {
   console.log(`
@@ -41,7 +42,8 @@ async function initializeMediator({
     OWNER: ${owner},
     TOKEN_FACTORY: ${tokenFactory},
     FEE_MANAGER: ${feeManager},
-    GAS_LIMIT_MANAGER: ${gasLimitManager}
+    GAS_LIMIT_MANAGER: ${gasLimitManager},
+    FORWARDING_RULES_MANAGER: ${forwardingRulesManager},
   `)
 
   return contract.methods
@@ -53,12 +55,20 @@ async function initializeMediator({
       gasLimitManager,
       owner,
       tokenFactory,
-      feeManager
+      feeManager,
+      forwardingRulesManager
     )
     .encodeABI()
 }
 
-async function initialize({ homeBridge, foreignBridge, tokenFactory, feeManager, gasLimitManager }) {
+async function initialize({
+  homeBridge,
+  foreignBridge,
+  tokenFactory,
+  feeManager,
+  gasLimitManager,
+  forwardingRulesManager,
+}) {
   let nonce = await web3Home.eth.getTransactionCount(deploymentAddress)
   const mediatorContract = new web3Home.eth.Contract(HomeOmnibridge.abi, homeBridge)
 
@@ -78,6 +88,7 @@ async function initialize({ homeBridge, foreignBridge, tokenFactory, feeManager,
       tokenFactory,
       feeManager,
       gasLimitManager,
+      forwardingRulesManager,
     },
   })
 

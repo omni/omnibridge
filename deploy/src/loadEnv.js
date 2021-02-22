@@ -18,9 +18,11 @@ const validateAddress = (address) => {
 
   throw new Error(`Invalid address: ${address}`)
 }
-const validateOptionalAddress = (address) => (address ? validateAddress(address) : '')
+const validateOptionalAddress = (address) => (address && address !== '0x' ? validateAddress(address) : '')
+const validateOptionalAddressOrFalse = (address) => (address === 'false' ? false : validateOptionalAddress(address))
 const addressValidator = envalid.makeValidator(validateAddress)
 const optionalAddressValidator = envalid.makeValidator(validateOptionalAddress)
+const optionalAddressOrFalseValidator = envalid.makeValidator(validateOptionalAddressOrFalse)
 const addressesValidator = envalid.makeValidator((addresses) => {
   addresses.split(' ').forEach(validateAddress)
   return addresses
@@ -75,6 +77,7 @@ switch (BRIDGE_MODE) {
       HOME_DAILY_LIMIT: bigNumValidator(),
       HOME_ERC677_TOKEN_IMAGE: optionalAddressValidator(),
       HOME_TOKEN_FACTORY: optionalAddressValidator(),
+      HOME_FORWARDING_RULES_MANAGER: optionalAddressOrFalseValidator(),
       FOREIGN_ERC677_TOKEN_IMAGE: optionalAddressValidator(),
       FOREIGN_TOKEN_FACTORY: optionalAddressValidator(),
     }

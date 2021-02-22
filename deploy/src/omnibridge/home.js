@@ -4,6 +4,7 @@ const { deployContract, upgradeProxy } = require('../deploymentUtils')
 const {
   HOME_ERC677_TOKEN_IMAGE,
   HOME_TOKEN_FACTORY,
+  HOME_FORWARDING_RULES_MANAGER,
   HOME_BRIDGE_OWNER,
   HOME_REWARDABLE,
   HOME_TRANSACTIONS_FEE,
@@ -21,6 +22,7 @@ const {
   TokenFactory,
   OmnibridgeFeeManager,
   SelectorTokenGasLimitManager,
+  MultiTokenForwardingRulesManager,
 } = require('../loadContracts')
 
 async function deployHome() {
@@ -75,6 +77,18 @@ async function deployHome() {
     console.log('\n[Home] New fee manager has been deployed: ', feeManager)
   }
 
+  let forwardingRulesManager = HOME_FORWARDING_RULES_MANAGER === false ? ZERO_ADDRESS : HOME_FORWARDING_RULES_MANAGER
+  if (forwardingRulesManager === '') {
+    console.log(`\n[Home] Deploying Forwarding Rules Manager contract with the following parameters:
+    OWNER: ${HOME_BRIDGE_OWNER}
+    `)
+    const manager = await deployContract(MultiTokenForwardingRulesManager, [HOME_BRIDGE_OWNER], { nonce: nonce++ })
+    forwardingRulesManager = manager.options.address
+    console.log('\n[Home] New Forwarding Rules Manager has been deployed: ', forwardingRulesManager)
+  } else {
+    console.log('\n[Home] Using existing Forwarding Rules Manager: ', forwardingRulesManager)
+  }
+
   console.log(`\n[Home] Deploying gas limit manager contract with the following parameters:
     HOME_AMB_BRIDGE: ${HOME_AMB_BRIDGE}
     OWNER: ${HOME_BRIDGE_OWNER}
@@ -108,6 +122,7 @@ async function deployHome() {
     tokenFactory: { address: tokenFactory },
     feeManager: { address: feeManager },
     gasLimitManager: { address: gasLimitManager.options.address },
+    forwardingRulesManager: { address: forwardingRulesManager },
   }
 }
 

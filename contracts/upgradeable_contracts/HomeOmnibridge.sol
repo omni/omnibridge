@@ -30,6 +30,8 @@ contract HomeOmnibridge is
      * @param _gasLimitManager the gas limit manager contract address.
      * @param _owner address of the owner of the mediator contract.
      * @param _tokenFactory address of the TokenFactory contract that will be used for the deployment of new tokens.
+     * @param _feeManager address of the OmnibridgeFeeManager contract that will be used for fee distribution.
+     * @param _forwardingRulesManager address of the MultiTokenForwardingRulesManager contract that will be used for managing lane permissions.
      */
     function initialize(
         address _bridgeContract,
@@ -39,7 +41,8 @@ contract HomeOmnibridge is
         address _gasLimitManager,
         address _owner,
         address _tokenFactory,
-        address _feeManager
+        address _feeManager,
+        address _forwardingRulesManager
     ) external onlyRelevantSender returns (bool) {
         require(!isInitialized());
 
@@ -51,6 +54,7 @@ contract HomeOmnibridge is
         _setOwner(_owner);
         _setTokenFactory(_tokenFactory);
         _setFeeManager(_feeManager);
+        _setForwardingRulesManager(_forwardingRulesManager);
 
         setInitialize();
 
