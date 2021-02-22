@@ -19,6 +19,7 @@ ${FLATTENER} ${BRIDGE_CONTRACTS_DIR}/modules/factory/TokenFactory.sol > flats/To
 ${FLATTENER} ${BRIDGE_CONTRACTS_DIR}/modules/factory/TokenProxy.sol > flats/TokenProxy_flat.sol
 ${FLATTENER} ${BRIDGE_CONTRACTS_DIR}/modules/forwarding_rules/MultiTokenForwardingRulesManager.sol > flats/MultiTokenForwardingRulesManager_flat.sol
 ${FLATTENER} ${BRIDGE_CONTRACTS_DIR}/modules/fee_manager/OmnibridgeFeeManager.sol > flats/OmnibridgeFeeManager_flat.sol
+${FLATTENER} ${BRIDGE_CONTRACTS_DIR}/modules/gas_limit/SelectorTokenGasLimitManager.sol > flats/SelectorTokenGasLimitManager_flat.sol
 
 echo "Flattening token contracts"
 cp ./precompiled/PermittableToken_flat.sol flats

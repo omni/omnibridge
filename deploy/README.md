@@ -124,6 +124,10 @@ HOME_ERC677_TOKEN_IMAGE=
 # address of an already deployed TokenFactory contract for creating new bridged tokens on the Home side.
 # leave empty, if you want to deploy a new TokenFactory
 HOME_TOKEN_FACTORY=
+# address of an already deployed MultiTokenForwardingRulesManager contract for managing AMB lane permissions.
+# leave empty, if you want to deploy a new MultiTokenForwardingRulesManager.
+# put false, if you want to do not use lane permissions.
+HOME_FORWARDING_RULES_MANAGER=
 
 # address of an already deployed PermittableToken contract that will be used as an implementation for all bridged tokens on the Foreign side
 # leave empty, if you want to deploy a new PermittableToken for further usage

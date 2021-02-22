@@ -4,6 +4,7 @@ const {
   FOREIGN_AMB_BRIDGE,
   HOME_ERC677_TOKEN_IMAGE,
   HOME_TOKEN_FACTORY,
+  HOME_FORWARDING_RULES_MANAGER,
   FOREIGN_ERC677_TOKEN_IMAGE,
   FOREIGN_TOKEN_FACTORY,
 } = require('../loadEnv')
@@ -29,6 +30,12 @@ async function preDeploy() {
   if (HOME_TOKEN_FACTORY) {
     if (!(await isContract(web3Home, HOME_TOKEN_FACTORY))) {
       throw new Error(`HOME_TOKEN_FACTORY should be a contract address`)
+    }
+  }
+
+  if (HOME_FORWARDING_RULES_MANAGER) {
+    if (!(await isContract(web3Home, HOME_FORWARDING_RULES_MANAGER))) {
+      throw new Error(`HOME_FORWARDING_RULES_MANAGER should be a contract address`)
     }
   }
 
