@@ -2,10 +2,10 @@ version: '3.8'
 services:
   home:
     image: trufflesuite/ganache-cli
-    command: --deterministic --chainId 1337 --blockTime 1
+    command: --deterministic --chainId 1337 --blockTime 1 --gasLimit 10000000
   foreign:
     image: trufflesuite/ganache-cli
-    command: --deterministic --chainId 1338 --blockTime 1
+    command: --deterministic --chainId 1338 --blockTime 1 --gasLimit 10000000
   deploy-amb:
     image: poanetwork/tokenbridge-contracts
     env_file: local-envs/deploy-amb.env

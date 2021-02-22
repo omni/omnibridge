@@ -4,11 +4,12 @@ if [ -f /.dockerenv ]; then
   # the script is run within the container
   echo "Omnibridge contract deployment started"
   yarn deploy
+  rc=$?
   if [ -f bridgeDeploymentResults.json ]; then
     cat bridgeDeploymentResults.json
     echo
   fi
-  exit 0
+  exit $rc
 fi
 
 which docker-compose > /dev/null

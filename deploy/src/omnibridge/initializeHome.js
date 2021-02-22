@@ -10,7 +10,6 @@ const {
   FOREIGN_DAILY_LIMIT,
   FOREIGN_MAX_AMOUNT_PER_TX,
   HOME_AMB_BRIDGE,
-  HOME_MEDIATOR_REQUEST_GAS_LIMIT,
   HOME_BRIDGE_OWNER,
   HOME_UPGRADEABLE_ADMIN,
 } = require('../loadEnv')
@@ -25,10 +24,10 @@ async function initializeMediator({
     minPerTx,
     executionDailyLimit,
     executionMaxPerTx,
-    requestGasLimit,
     owner,
     tokenFactory,
     feeManager,
+    gasLimitManager,
   },
 }) {
   console.log(`
@@ -39,10 +38,10 @@ async function initializeMediator({
     MIN_AMOUNT_PER_TX: ${minPerTx} which is ${fromWei(minPerTx)} in eth,
     EXECUTION_DAILY_LIMIT : ${executionDailyLimit} which is ${fromWei(executionDailyLimit)} in eth,
     EXECUTION_MAX_AMOUNT_PER_TX: ${executionMaxPerTx} which is ${fromWei(executionMaxPerTx)} in eth,
-    MEDIATOR_REQUEST_GAS_LIMIT : ${requestGasLimit},
     OWNER: ${owner},
     TOKEN_FACTORY: ${tokenFactory},
-    FEE_MANAGER: ${feeManager}
+    FEE_MANAGER: ${feeManager},
+    GAS_LIMIT_MANAGER: ${gasLimitManager}
   `)
 
   return contract.methods
@@ -51,7 +50,7 @@ async function initializeMediator({
       mediatorContract,
       [dailyLimit.toString(), maxPerTx.toString(), minPerTx.toString()],
       [executionDailyLimit.toString(), executionMaxPerTx.toString()],
-      requestGasLimit.toString(),
+      gasLimitManager,
       owner,
       tokenFactory,
       feeManager
@@ -59,7 +58,7 @@ async function initializeMediator({
     .encodeABI()
 }
 
-async function initialize({ homeBridge, foreignBridge, tokenFactory, feeManager }) {
+async function initialize({ homeBridge, foreignBridge, tokenFactory, feeManager, gasLimitManager }) {
   let nonce = await web3Home.eth.getTransactionCount(deploymentAddress)
   const mediatorContract = new web3Home.eth.Contract(HomeOmnibridge.abi, homeBridge)
 
@@ -70,7 +69,6 @@ async function initialize({ homeBridge, foreignBridge, tokenFactory, feeManager 
     params: {
       bridgeContract: HOME_AMB_BRIDGE,
       mediatorContract: foreignBridge,
-      requestGasLimit: HOME_MEDIATOR_REQUEST_GAS_LIMIT,
       owner: HOME_BRIDGE_OWNER,
       dailyLimit: HOME_DAILY_LIMIT,
       maxPerTx: HOME_MAX_AMOUNT_PER_TX,
@@ -79,6 +77,7 @@ async function initialize({ homeBridge, foreignBridge, tokenFactory, feeManager 
       executionMaxPerTx: FOREIGN_MAX_AMOUNT_PER_TX,
       tokenFactory,
       feeManager,
+      gasLimitManager,
     },
   })
 

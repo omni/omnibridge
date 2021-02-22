@@ -9,6 +9,8 @@ const {
   HOME_TRANSACTIONS_FEE,
   FOREIGN_TRANSACTIONS_FEE,
   HOME_MEDIATOR_REWARD_ACCOUNTS,
+  HOME_AMB_BRIDGE,
+  HOME_MEDIATOR_REQUEST_GAS_LIMIT,
 } = require('../loadEnv')
 const { ZERO_ADDRESS } = require('../constants')
 
@@ -18,6 +20,7 @@ const {
   PermittableToken,
   TokenFactory,
   OmnibridgeFeeManager,
+  SelectorTokenGasLimitManager,
 } = require('../loadContracts')
 
 async function deployHome() {
@@ -72,6 +75,19 @@ async function deployHome() {
     console.log('\n[Home] New fee manager has been deployed: ', feeManager)
   }
 
+  console.log(`\n[Home] Deploying gas limit manager contract with the following parameters:
+    HOME_AMB_BRIDGE: ${HOME_AMB_BRIDGE}
+    OWNER: ${HOME_BRIDGE_OWNER}
+  `)
+  const gasLimitManager = await deployContract(
+    SelectorTokenGasLimitManager,
+    [HOME_AMB_BRIDGE, HOME_BRIDGE_OWNER, HOME_MEDIATOR_REQUEST_GAS_LIMIT],
+    { nonce: nonce++ }
+  )
+  console.log('\n[Home] New Gas Limit Manager has been deployed: ', gasLimitManager.options.address)
+  console.log('[Home] Manual setup of request gas limits in the manager is recommended.')
+  console.log('[Home] Please, call setCommonRequestGasLimits on the Gas Limit Manager contract.')
+
   console.log('\n[Home] Deploying Bridge Mediator implementation\n')
   const homeBridgeImplementation = await deployContract(HomeOmnibridge, [], {
     nonce: nonce++,
@@ -91,6 +107,7 @@ async function deployHome() {
     homeBridgeMediator: { address: homeBridgeStorage.options.address },
     tokenFactory: { address: tokenFactory },
     feeManager: { address: feeManager },
+    gasLimitManager: { address: gasLimitManager.options.address },
   }
 }
 

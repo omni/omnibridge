@@ -22,9 +22,9 @@ cp .env.example .env
 
 6. Run `npm run deploy`.
 
-## `MULTI-AMB-ERC-TO-ERC` Bridge Mode Configuration Example.
+## `OMNIBRIDGE` Bridge Mode Configuration Example.
 
-This example of an `.env` file for the `MULTI-AMB-ERC-TO-ERC` bridge mode includes comments describing each parameter.
+This example of an `.env` file for the `OMNIBRIDGE` bridge mode includes comments describing each parameter.
 
 ```bash
 # The type of bridge. Defines set of contracts to be deployed.
