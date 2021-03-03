@@ -38,7 +38,8 @@ const selectors = {
 
 function runTests(accounts, isHome) {
   const Mediator = isHome ? HomeOmnibridge : ForeignOmnibridge
-  const modifyName = (name) => name + (isHome ? ' on xDai' : ' on Mainnet')
+  const SUFFIX = ' on Testnet'
+  const modifyName = (name) => name + SUFFIX
   const otherSideMediator = '0x1e33FBB006F47F78704c954555a5c52C2A7f409D'
   const otherSideToken1 = '0xAfb77d544aFc1e2aD3dEEAa20F3c80859E7Fc3C9'
   const otherSideToken2 = '0x876bD892b01D1c9696D873f74cbeF8fc9Bfb1142'
@@ -136,7 +137,7 @@ function runTests(accounts, isHome) {
   })
 
   beforeEach(async () => {
-    contract = await Mediator.new()
+    contract = await Mediator.new(SUFFIX)
     ambBridgeContract = await AMBMock.new()
     token = await ERC677BridgeToken.new('TEST', 'TST', 18)
     currentDay = await contract.getCurrentDay()

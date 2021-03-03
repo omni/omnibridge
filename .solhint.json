@@ -6,6 +6,8 @@
     "avoid-low-level-calls": "off",
     "no-inline-assembly": "off",
     "reason-string": "off",
+    "no-empty-blocks": "off",
+    "var-name-mixedcase": "off",
     "func-visibility": ["warn", { "ignoreConstructors": true } ],
     "compiler-version": ["error", "0.7.5"]
   }

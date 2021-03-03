@@ -37,6 +37,21 @@ abstract contract BasicOmnibridge is
     using SafeERC20 for IERC677;
     using SafeMath for uint256;
 
+    // Workaround for storing variable up-to-32 bytes suffix
+    uint256 private immutable SUFFIX_SIZE;
+    bytes32 private immutable SUFFIX;
+
+    // Since contract is intended to be deployed under EternalStorageProxy, only constant and immutable variables can be set here
+    constructor(string memory _suffix) {
+        require(bytes(_suffix).length <= 32);
+        bytes32 suffix;
+        assembly {
+            suffix := mload(add(_suffix, 32))
+        }
+        SUFFIX = suffix;
+        SUFFIX_SIZE = bytes(_suffix).length;
+    }
+
     /**
      * @dev Handles the bridged tokens for the first time, includes deployment of new TokenProxy contract.
      * Checks that the value is inside the execution limits and invokes the Mint or Unlock accordingly.
@@ -452,12 +467,24 @@ abstract contract BasicOmnibridge is
         }
     }
 
+    /**
+     * @dev Internal function for transforming the bridged token name. Appends a side-specific suffix.
+     * @param _name bridged token from the other side.
+     * @return token name for this side of the bridge.
+     */
+    function _transformName(string memory _name) internal view returns (string memory) {
+        string memory result = string(abi.encodePacked(_name, SUFFIX));
+        uint256 size = SUFFIX_SIZE;
+        assembly {
+            mstore(result, add(mload(_name), size))
+        }
+        return result;
+    }
+
     function _handleTokens(
         address _token,
         bool _isNative,
         address _recipient,
         uint256 _value
     ) internal virtual;
-
-    function _transformName(string memory _name) internal pure virtual returns (string memory);
 }
