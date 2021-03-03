@@ -12,6 +12,8 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager {
     using SafeERC20 for IERC677;
     using SafeMath for uint256;
 
+    constructor(string memory _suffix) BasicOmnibridge(_suffix) {}
+
     /**
      * @dev Stores the initial parameters of the mediator.
      * @param _bridgeContract the address of the AMB bridge contract.
@@ -139,15 +141,6 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager {
         } else {
             _getMinterFor(_token).mint(_recipient, _value);
         }
-    }
-
-    /**
-     * @dev Internal function for transforming the bridged token name. Appends a side-specific suffix.
-     * @param _name bridged token from the other side.
-     * @return token name for this side of the bridge.
-     */
-    function _transformName(string memory _name) internal pure override returns (string memory) {
-        return string(abi.encodePacked(_name, " on Mainnet"));
     }
 
     /**

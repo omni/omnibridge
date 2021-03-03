@@ -16,7 +16,6 @@ import "../upgradeable_contracts/Claimable.sol";
  */
 contract WETHOmnibridgeRouter is OwnableModule, Claimable {
     IOmnibridge public immutable bridge;
-    // solhint-disable-next-line var-name-mixedcase
     IWETH public immutable WETH;
 
     /**

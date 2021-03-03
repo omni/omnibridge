@@ -15,7 +15,6 @@ contract MultiTokenForwardingRulesManager is OwnableModule {
 
     event ForwardingRuleUpdated(address token, address sender, address receiver, int256 lane);
 
-    // solhint-disable-next-line no-empty-blocks
     constructor(address _owner) OwnableModule(_owner) {}
 
     /**

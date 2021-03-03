@@ -19,6 +19,8 @@ contract HomeOmnibridge is
     using SafeMath for uint256;
     using SafeERC20 for IERC677;
 
+    constructor(string memory _suffix) BasicOmnibridge(_suffix) {}
+
     /**
      * @dev Stores the initial parameters of the mediator.
      * @param _bridgeContract the address of the AMB bridge contract.
@@ -189,15 +191,6 @@ contract HomeOmnibridge is
             _useOracleLane
                 ? bridge.requireToPassMessage(executor, _data, gasLimit)
                 : bridge.requireToConfirmMessage(executor, _data, gasLimit);
-    }
-
-    /**
-     * @dev Internal function for transforming the bridged token name. Appends a side-specific suffix.
-     * @param _name bridged token from the other side.
-     * @return token name for this side of the bridge.
-     */
-    function _transformName(string memory _name) internal pure override returns (string memory) {
-        return string(abi.encodePacked(_name, " on xDai"));
     }
 
     /**
