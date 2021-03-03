@@ -31,8 +31,6 @@ abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard {
                 assembly {
                     receiver := calldataload(120)
                 }
-                require(receiver != address(0));
-                require(receiver != mediatorContractOnOtherSide());
                 if (_data.length > 20) {
                     assembly {
                         data := mload(0x40)
