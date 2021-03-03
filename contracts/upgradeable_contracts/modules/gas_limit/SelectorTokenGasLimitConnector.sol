@@ -37,7 +37,12 @@ abstract contract SelectorTokenGasLimitConnector is Ownable, BasicAMBMediator {
         addressStorage[GAS_LIMIT_MANAGER_CONTRACT] = _manager;
     }
 
-    function _chooseRequestGasLimit(bytes memory _data) internal view override returns (uint256) {
+    /**
+     * @dev Tells the gas limit to use for the message execution by the AMB bridge on the other network.
+     * @param _data calldata to be used on the other side of the bridge, when execution a message.
+     * @return the gas limit fot the message execution.
+     */
+    function _chooseRequestGasLimit(bytes memory _data) internal view returns (uint256) {
         SelectorTokenGasLimitManager manager = gasLimitManager();
         if (address(manager) == address(0)) {
             return bridgeContract().maxGasPerTx();

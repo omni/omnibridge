@@ -28,16 +28,6 @@ abstract contract GasLimitManager is BasicAMBMediator {
     }
 
     /**
-     * @dev Tells the gas limit to use for the message execution by the AMB bridge on the other network.
-     * @param _data calldata to be used on the other side of the bridge, when execution a message.
-     * @return the gas limit fot the message execution.
-     */
-    function _chooseRequestGasLimit(bytes memory _data) internal view override returns (uint256) {
-        (_data);
-        return requestGasLimit();
-    }
-
-    /**
      * @dev Stores the gas limit to be used in the message execution by the AMB bridge on the other network.
      * @param _gasLimit the gas limit fot the message execution.
      */
