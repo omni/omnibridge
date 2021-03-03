@@ -104,7 +104,7 @@ async function deployHome() {
   console.log('[Home] Please, call setCommonRequestGasLimits on the Gas Limit Manager contract.')
 
   console.log('\n[Home] Deploying Bridge Mediator implementation with the following parameters:')
-  console.log(`    TOKEN_NAME_SUFFIX=${HOME_TOKEN_NAME_SUFFIX}\n`)
+  console.log(`    TOKEN_NAME_SUFFIX: ${HOME_TOKEN_NAME_SUFFIX}\n`)
   const homeBridgeImplementation = await deployContract(HomeOmnibridge, [HOME_TOKEN_NAME_SUFFIX], {
     nonce: nonce++,
   })

@@ -45,7 +45,7 @@ async function deployForeign() {
   }
 
   console.log('\n[Foreign] Deploying Bridge Mediator implementation with the following parameters:')
-  console.log(`    TOKEN_NAME_SUFFIX=${FOREIGN_TOKEN_NAME_SUFFIX}\n`)
+  console.log(`    TOKEN_NAME_SUFFIX: ${FOREIGN_TOKEN_NAME_SUFFIX}\n`)
   const foreignBridgeImplementation = await deployContract(ForeignOmnibridge, [FOREIGN_TOKEN_NAME_SUFFIX], {
     network: 'foreign',
     nonce: nonce++,
