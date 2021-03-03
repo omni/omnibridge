@@ -80,6 +80,8 @@ switch (BRIDGE_MODE) {
       HOME_FORWARDING_RULES_MANAGER: optionalAddressOrFalseValidator(),
       FOREIGN_ERC677_TOKEN_IMAGE: optionalAddressValidator(),
       FOREIGN_TOKEN_FACTORY: optionalAddressValidator(),
+      HOME_TOKEN_NAME_SUFFIX: envalid.str(),
+      FOREIGN_TOKEN_NAME_SUFFIX: envalid.str(),
     }
 
     if (HOME_REWARDABLE === 'BOTH_DIRECTIONS') {
