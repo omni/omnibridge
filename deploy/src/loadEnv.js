@@ -27,6 +27,16 @@ const addressesValidator = envalid.makeValidator((addresses) => {
   addresses.split(' ').forEach(validateAddress)
   return addresses
 })
+const validateStringMaxLength = (maxLength) => (str) => {
+  if (typeof str !== 'string') {
+    throw new Error(`${str} is not a string`)
+  }
+  if (str.length > maxLength) {
+    throw new Error(`${str} length is beyond the max limit of ${maxLength} characters`)
+  }
+  return str
+}
+const suffixValidator = envalid.makeValidator(validateStringMaxLength(32))
 
 function checkLimits(min, max, daily, prefix) {
   if (min.isZero() || min.gte(max) || max.gte(daily)) {
@@ -80,8 +90,8 @@ switch (BRIDGE_MODE) {
       HOME_FORWARDING_RULES_MANAGER: optionalAddressOrFalseValidator(),
       FOREIGN_ERC677_TOKEN_IMAGE: optionalAddressValidator(),
       FOREIGN_TOKEN_FACTORY: optionalAddressValidator(),
-      HOME_TOKEN_NAME_SUFFIX: envalid.str(),
-      FOREIGN_TOKEN_NAME_SUFFIX: envalid.str(),
+      HOME_TOKEN_NAME_SUFFIX: suffixValidator(32),
+      FOREIGN_TOKEN_NAME_SUFFIX: suffixValidator(32),
     }
 
     if (HOME_REWARDABLE === 'BOTH_DIRECTIONS') {

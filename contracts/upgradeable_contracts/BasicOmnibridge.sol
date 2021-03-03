@@ -43,6 +43,7 @@ abstract contract BasicOmnibridge is
 
     // Since contract is intended to be deployed under EternalStorageProxy, only constant and immutable variables can be set here
     constructor(string memory _suffix) {
+        require(bytes(_suffix).length <= 32);
         bytes32 suffix;
         assembly {
             suffix := mload(add(_suffix, 32))
