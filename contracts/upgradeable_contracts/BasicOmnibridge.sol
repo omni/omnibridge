@@ -176,7 +176,7 @@ abstract contract BasicOmnibridge is
      * @return message id of the send message.
      */
     function isRegisteredAsNativeToken(address _token) public view returns (bool) {
-        return nativeTokenAddress(_token) == address(0);
+        return isTokenRegistered(_token) && nativeTokenAddress(_token) == address(0);
     }
 
     /**
@@ -190,7 +190,7 @@ abstract contract BasicOmnibridge is
         address _recipient,
         uint256 _value
     ) internal override {
-        _releaseTokens(isRegisteredAsNativeToken(_token), _token, _recipient, _value, _value);
+        _releaseTokens(nativeTokenAddress(_token) == address(0), _token, _recipient, _value, _value);
     }
 
     /**
@@ -221,7 +221,7 @@ abstract contract BasicOmnibridge is
         onlyIfUpgradeabilityOwner
         validAddress(_receiver)
     {
-        require(isBridgedTokenDeployAcknowledged(_token));
+        require(isRegisteredAsNativeToken(_token));
 
         uint256 balance = IERC677(_token).balanceOf(address(this));
         uint256 expectedBalance = mediatorBalance(_token);
@@ -233,10 +233,9 @@ abstract contract BasicOmnibridge is
             diff = available;
         }
         addTotalSpentPerDay(_token, getCurrentDay(), diff);
-        _setMediatorBalance(_token, mediatorBalance(_token).add(diff));
 
-        bytes memory data = abi.encodeWithSelector(this.handleBridgedTokens.selector, _token, _receiver, diff);
-
+        uint8 decimals = uint8(TokenReader.readDecimals(_token));
+        bytes memory data = _prepareMessage(address(0), _token, _receiver, diff, decimals, new bytes(0));
         bytes32 _messageId = _passMessage(data, true);
         _recordBridgeOperation(_messageId, _token, _receiver, diff);
     }

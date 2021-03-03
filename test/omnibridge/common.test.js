@@ -867,51 +867,52 @@ function runTests(accounts, isHome) {
             await contract.setDailyLimit(token.address, ether('5')).should.be.fulfilled
             await contract.setMaxPerTx(token.address, ether('2')).should.be.fulfilled
 
-            await contract.fixMediatorBalance(token.address, owner, { from: owner }).should.be.rejected
-
-            const reverseData = contract.contract.methods.handleNativeTokens(token.address, user, halfEther).encodeABI()
-
-            expect(await executeMessageCall(otherMessageId, reverseData)).to.be.equal(true)
-
             await contract.fixMediatorBalance(token.address, owner, { from: user }).should.be.rejected
             await contract.fixMediatorBalance(ZERO_ADDRESS, owner, { from: owner }).should.be.rejected
             await contract.fixMediatorBalance(token.address, ZERO_ADDRESS, { from: owner }).should.be.rejected
             await contract.fixMediatorBalance(token.address, owner, { from: owner }).should.be.fulfilled
             await contract.fixMediatorBalance(token.address, owner, { from: owner }).should.be.rejected
 
-            expect(await contract.mediatorBalance(token.address)).to.be.bignumber.equal(ether('2.5'))
-            expect(await token.balanceOf(contract.address)).to.be.bignumber.equal(ether('2.5'))
+            expect(await contract.mediatorBalance(token.address)).to.be.bignumber.equal(ether('3'))
+            expect(await token.balanceOf(contract.address)).to.be.bignumber.equal(ether('3'))
             expect(await contract.totalSpentPerDay(token.address, currentDay)).to.be.bignumber.equal(ether('3'))
             const events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
             expect(events.length).to.be.equal(2)
             const { data, dataType, executor } = events[1].returnValues
-            expect(data.slice(0, 10)).to.be.equal(selectors.handleBridgedTokens)
-            const args = web3.eth.abi.decodeParameters(['address', 'address', 'uint256'], data.slice(10))
+            expect(data.slice(0, 10)).to.be.equal(selectors.deployAndHandleBridgedTokens)
             expect(executor).to.be.equal(otherSideMediator)
             expect(dataType).to.be.bignumber.equal('0')
-            expect(args[0]).to.be.equal(token.address)
-            expect(args[1]).to.be.equal(owner)
-            expect(args[2]).to.be.bignumber.equal(ether('2'))
           })
 
-          it('should allow to fix extra mediator balance with respect to limits', async () => {
+          it('should use different methods on the other side', async () => {
+            await contract.fixMediatorBalance(token.address, owner, { from: owner }).should.be.fulfilled
+
             const reverseData = contract.contract.methods.handleNativeTokens(token.address, user, halfEther).encodeABI()
 
             expect(await executeMessageCall(otherMessageId, reverseData)).to.be.equal(true)
 
+            await contract.fixMediatorBalance(token.address, owner, { from: owner }).should.be.fulfilled
+
+            const events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
+            expect(events.length).to.be.equal(3)
+            expect(events[1].returnValues.data.slice(0, 10)).to.be.equal(selectors.deployAndHandleBridgedTokens)
+            expect(events[2].returnValues.data.slice(0, 10)).to.be.equal(selectors.handleBridgedTokens)
+          })
+
+          it('should allow to fix extra mediator balance with respect to limits', async () => {
             await contract.fixMediatorBalance(token.address, owner, { from: user }).should.be.rejected
             await contract.fixMediatorBalance(ZERO_ADDRESS, owner, { from: owner }).should.be.rejected
             await contract.fixMediatorBalance(token.address, ZERO_ADDRESS, { from: owner }).should.be.rejected
             await contract.fixMediatorBalance(token.address, owner, { from: owner }).should.be.fulfilled
 
-            expect(await contract.mediatorBalance(token.address)).to.be.bignumber.equal(ether('1.5'))
-            expect(await token.balanceOf(contract.address)).to.be.bignumber.equal(ether('2.5'))
+            expect(await contract.mediatorBalance(token.address)).to.be.bignumber.equal(ether('2'))
+            expect(await token.balanceOf(contract.address)).to.be.bignumber.equal(ether('3'))
             expect(await contract.totalSpentPerDay(token.address, currentDay)).to.be.bignumber.equal(ether('2'))
 
             await contract.fixMediatorBalance(token.address, owner, { from: owner }).should.be.fulfilled
 
-            expect(await contract.mediatorBalance(token.address)).to.be.bignumber.equal(ether('2'))
-            expect(await token.balanceOf(contract.address)).to.be.bignumber.equal(ether('2.5'))
+            expect(await contract.mediatorBalance(token.address)).to.be.bignumber.equal(ether('2.5'))
+            expect(await token.balanceOf(contract.address)).to.be.bignumber.equal(ether('3'))
             expect(await contract.totalSpentPerDay(token.address, currentDay)).to.be.bignumber.equal(ether('2.5'))
             const events = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
             expect(events.length).to.be.equal(3)
