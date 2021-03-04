@@ -52,7 +52,7 @@ contract SelectorTokenGasLimitManager is OwnableModule {
      * @dev Sets the default gas limit to be used in the message execution by the AMB bridge on the other network.
      * This value can't exceed the parameter maxGasPerTx defined on the AMB bridge.
      * Only the owner can call this method.
-     * @param _gasLimit the gas limit fot the message execution.
+     * @param _gasLimit the gas limit for the message execution.
      */
     function setRequestGasLimit(uint256 _gasLimit) external onlyOwner validGasLimit(_gasLimit) {
         defaultGasLimit = _gasLimit;
@@ -63,7 +63,7 @@ contract SelectorTokenGasLimitManager is OwnableModule {
      * This value can't exceed the parameter maxGasPerTx defined on the AMB bridge.
      * Only the owner can call this method.
      * @param _selector method selector of the outgoing message payload.
-     * @param _gasLimit the gas limit fot the message execution.
+     * @param _gasLimit the gas limit for the message execution.
      */
     function setRequestGasLimit(bytes4 _selector, uint256 _gasLimit) external onlyOwner validGasLimit(_gasLimit) {
         selectorGasLimit[_selector] = _gasLimit;
@@ -75,7 +75,7 @@ contract SelectorTokenGasLimitManager is OwnableModule {
      * Only the owner can call this method.
      * @param _selector method selector of the outgoing message payload.
      * @param _token address of the native token that is used in the first argument of handleBridgedTokens/handleNativeTokens.
-     * @param _gasLimit the gas limit fot the message execution.
+     * @param _gasLimit the gas limit for the message execution.
      */
     function setRequestGasLimit(
         bytes4 _selector,
@@ -115,7 +115,7 @@ contract SelectorTokenGasLimitManager is OwnableModule {
     /**
      * @dev Tells the gas limit to use for the message execution by the AMB bridge on the other network.
      * @param _data calldata to be used on the other side of the bridge, when execution a message.
-     * @return the gas limit fot the message execution.
+     * @return the gas limit for the message execution.
      */
     function requestGasLimit(bytes memory _data) external view returns (uint256) {
         bytes4 selector;

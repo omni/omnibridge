@@ -77,7 +77,7 @@ abstract contract BasicOmnibridge is
 
     /**
      * @dev Handles the bridged tokens for the first time, includes deployment of new TokenProxy contract.
-     * Uses transferAndCall for bridging tokens.
+     * Executes a callback on the receiver.
      * Checks that the value is inside the execution limits and invokes the Mint accordingly.
      * @param _token address of the native ERC20/ERC677 token on the other side.
      * @param _name name of the native token, name suffix will be appended, if empty, symbol will be used instead.
@@ -125,7 +125,7 @@ abstract contract BasicOmnibridge is
     /**
      * @dev Handles the bridged tokens for the already registered token pair.
      * Checks that the value is inside the execution limits and invokes the Unlock accordingly.
-     * Uses transferAndCall for bridging tokens.
+     * Executes a callback on the receiver.
      * @param _token address of the native ERC20/ERC677 token on the other side.
      * @param _recipient address that will receive the tokens.
      * @param _value amount of tokens to be received.
@@ -136,7 +136,7 @@ abstract contract BasicOmnibridge is
         address _recipient,
         uint256 _value,
         bytes memory _data
-    ) external virtual onlyMediator {
+    ) external onlyMediator {
         address token = bridgedTokenAddress(_token);
 
         require(isTokenRegistered(token));
@@ -166,7 +166,7 @@ abstract contract BasicOmnibridge is
     /**
      * @dev Handles the bridged tokens that are native to this chain.
      * Checks that the value is inside the execution limits and invokes the Unlock accordingly.
-     * Uses transferAndCall for bridging tokens.
+     * Executes a callback on the receiver.
      * @param _token native ERC20 token.
      * @param _recipient address that will receive the tokens.
      * @param _value amount of tokens to be received.
@@ -415,7 +415,7 @@ abstract contract BasicOmnibridge is
     }
 
     /**
-     * Internal function getting address of the bridged token. Deploys new token is necessary.
+     * Internal function for getting address of the bridged token. Deploys new token if necessary.
      * @param _token address of the token contract on the other side of the bridge.
      * @param _name name of the native token, name suffix will be appended, if empty, symbol will be used instead.
      * @param _symbol symbol of the bridged token, if empty, name will be used instead.

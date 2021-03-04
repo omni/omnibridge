@@ -95,6 +95,4 @@ abstract contract BasicAMBMediator is Ownable {
     }
 
     function _passMessage(bytes memory _data, bool _useOracleLane) internal virtual returns (bytes32);
-
-    function _chooseRequestGasLimit(bytes memory _data) internal view virtual returns (uint256);
 }

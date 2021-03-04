@@ -151,8 +151,7 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager {
      */
     function _passMessage(bytes memory _data, bool _useOracleLane) internal override returns (bytes32) {
         (_useOracleLane);
-        uint256 gasLimit = _chooseRequestGasLimit(_data);
 
-        return bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), _data, gasLimit);
+        return bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), _data, requestGasLimit());
     }
 }
