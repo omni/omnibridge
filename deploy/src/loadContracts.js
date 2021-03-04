@@ -6,5 +6,5 @@ module.exports = {
   MultiTokenForwardingRulesManager: require(`../../build/contracts/MultiTokenForwardingRulesManager.json`),
   SelectorTokenGasLimitManager: require(`../../build/contracts/SelectorTokenGasLimitManager.json`),
   OmnibridgeFeeManager: require(`../../build/contracts/OmnibridgeFeeManager.json`),
-  PermittableToken: require(`../../precompiled/PermittableToken.json`),
+  OmnibridgeTokenImage: require(`../../build/contracts/OmnibridgeTokenImage.json`),
 }

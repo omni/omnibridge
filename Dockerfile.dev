@@ -6,7 +6,6 @@ COPY package.json yarn.lock ./
 RUN yarn
 
 COPY truffle-config.js truffle-config.js
-COPY ./precompiled ./precompiled
 COPY ./contracts ./contracts
 RUN yarn compile
 

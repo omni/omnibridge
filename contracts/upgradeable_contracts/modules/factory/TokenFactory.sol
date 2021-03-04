@@ -34,15 +34,13 @@ contract TokenFactory is OwnableModule {
      * @param _name deployed token name.
      * @param _symbol deployed token symbol.
      * @param _decimals deployed token decimals.
-     * @param _chainId chain id of the current environment.
      * @return address of a newly created contract.
      */
     function deploy(
         string calldata _name,
         string calldata _symbol,
-        uint8 _decimals,
-        uint256 _chainId
+        uint8 _decimals
     ) external returns (address) {
-        return address(new TokenProxy(tokenImage, _name, _symbol, _decimals, _chainId, msg.sender));
+        return address(new TokenProxy(tokenImage, _name, _symbol, _decimals, msg.sender));
     }
 }

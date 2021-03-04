@@ -7,7 +7,8 @@ module.exports = {
   forceBackupServer: true,
   providerOptions: {
     port: 8545,
-    seed: 'TestRPC is awesome!'
+    seed: 'TestRPC is awesome!',
+    _chainId: 1337
   },
   onServerReady: async (config) => {
     const web3 = new Web3(config.provider)
