@@ -1685,6 +1685,17 @@ function runTests(accounts, isHome) {
         foreignToHomeFee = await feeManager.FOREIGN_TO_HOME_FEE()
       })
 
+      it('should proxy static calls to fee manager', async () => {
+        const proxy = await OmnibridgeFeeManager.at(contract.address)
+        await feeManager.addRewardAddress(accounts[8]).should.be.fulfilled
+
+        expect(await proxy.HOME_TO_FOREIGN_FEE()).to.be.equal(homeToForeignFee)
+        expect(await proxy.FOREIGN_TO_HOME_FEE()).to.be.equal(foreignToHomeFee)
+        expect(await proxy.isRewardAddress(accounts[8])).to.be.equal(true)
+        expect(await proxy.isRewardAddress(accounts[9])).to.be.equal(false)
+        expect(await proxy.calculateFee(homeToForeignFee, token.address, oneEther)).to.be.bignumber.equal(ether('0.02'))
+      })
+
       it('change reward addresses', async () => {
         await feeManager.addRewardAddress(accounts[8], { from: user }).should.be.rejected
         await feeManager.addRewardAddress(owner).should.be.rejected

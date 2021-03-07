@@ -27,11 +27,28 @@ abstract contract OmnibridgeFeeManagerConnector is Ownable {
     }
 
     /**
-     * @dev Retrieves an address of the fee manager cosntract.
+     * @dev Retrieves an address of the fee manager contract.
      * @return address of the fee manager contract.
      */
     function feeManager() public view returns (OmnibridgeFeeManager) {
         return OmnibridgeFeeManager(addressStorage[FEE_MANAGER_CONTRACT]);
+    }
+
+    // solhint-disable-next-line no-complex-fallback, payable-fallback
+    fallback() external {
+        if (
+            msg.sig == 0xfab19091 || // OmnibridgeFeeManager.HOME_TO_FOREIGN_FEE.selector
+            msg.sig == 0xf3ce14c2 || // OmnibridgeFeeManager.FOREIGN_TO_HOME_FEE.selector
+            msg.sig == OmnibridgeFeeManager.calculateFee.selector ||
+            msg.sig == OmnibridgeFeeManager.isRewardAddress.selector
+        ) {
+            (bool status, bytes memory returnData) = addressStorage[FEE_MANAGER_CONTRACT].staticcall(msg.data);
+            require(status);
+            assembly {
+                return(add(returnData, 32), mload(returnData))
+            }
+        }
+        revert();
     }
 
     /**
