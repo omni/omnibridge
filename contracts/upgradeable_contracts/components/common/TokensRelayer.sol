@@ -1,5 +1,6 @@
 pragma solidity 0.7.5;
 
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "../../../interfaces/IERC677.sol";
 import "../../../libraries/Bytes.sol";
@@ -11,6 +12,7 @@ import "../../BasicAMBMediator.sol";
  * @dev Functionality for bridging multiple tokens to the other side of the bridge.
  */
 abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard {
+    using SafeMath for uint256;
     using SafeERC20 for IERC677;
 
     /**
@@ -108,10 +110,13 @@ abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard {
         // which will call passMessage.
         require(!lock());
 
+        uint256 balanceBefore = token.balanceOf(address(this));
         setLock(true);
         token.safeTransferFrom(msg.sender, address(this), _value);
         setLock(false);
-        bridgeSpecificActionsOnTokenTransfer(address(token), msg.sender, _receiver, _value, _data);
+        uint256 balanceDiff = token.balanceOf(address(this)).sub(balanceBefore);
+        require(balanceDiff <= _value);
+        bridgeSpecificActionsOnTokenTransfer(address(token), msg.sender, _receiver, balanceDiff, _data);
     }
 
     function bridgeSpecificActionsOnTokenTransfer(
