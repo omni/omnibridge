@@ -1,21 +1,21 @@
 pragma solidity 0.7.5;
 
 import "./TokenProxy.sol";
-import "../OwnableModule.sol";
+import "../OmnibridgeModule.sol";
 
 /**
  * @title TokenFactory
  * @dev Factory contract for deployment of new TokenProxy contracts.
  */
-contract TokenFactory is OwnableModule {
+contract TokenFactory is OmnibridgeModule {
     address public tokenImage;
 
     /**
      * @dev Initializes this contract
-     * @param _owner of this factory contract.
+     * @param _mediator address of the mediator contract used together with this token factory.
      * @param _tokenImage address of the token image contract that should be used for creation of new tokens.
      */
-    constructor(address _owner, address _tokenImage) OwnableModule(_owner) {
+    constructor(IOwnable _mediator, address _tokenImage) OmnibridgeModule(_mediator) {
         tokenImage = _tokenImage;
     }
 

@@ -1,12 +1,7 @@
 const { web3Foreign, deploymentAddress } = require('../web3')
 const { deployContract, upgradeProxy } = require('../deploymentUtils')
 const { EternalStorageProxy, ForeignOmnibridge, PermittableToken, TokenFactory } = require('../loadContracts')
-const {
-  FOREIGN_TOKEN_FACTORY,
-  FOREIGN_ERC677_TOKEN_IMAGE,
-  FOREIGN_BRIDGE_OWNER,
-  FOREIGN_TOKEN_NAME_SUFFIX,
-} = require('../loadEnv')
+const { FOREIGN_TOKEN_FACTORY, FOREIGN_ERC677_TOKEN_IMAGE, FOREIGN_TOKEN_NAME_SUFFIX } = require('../loadEnv')
 
 async function deployForeign() {
   let nonce = await web3Foreign.eth.getTransactionCount(deploymentAddress)
@@ -16,7 +11,8 @@ async function deployForeign() {
     network: 'foreign',
     nonce: nonce++,
   })
-  console.log('[Foreign] Bridge Mediator Storage: ', foreignBridgeStorage.options.address)
+  const storageAddress = foreignBridgeStorage.options.address
+  console.log('[Foreign] Bridge Mediator Storage: ', storageAddress)
 
   let tokenFactory = FOREIGN_TOKEN_FACTORY
   if (!tokenFactory) {
@@ -34,7 +30,7 @@ async function deployForeign() {
       console.log('\n[Foreign] Using existing ERC677 token image: ', foreignTokenImage)
     }
     console.log('\n[Foreign] Deploying new token factory')
-    const factory = await deployContract(TokenFactory, [FOREIGN_BRIDGE_OWNER, foreignTokenImage], {
+    const factory = await deployContract(TokenFactory, [storageAddress, foreignTokenImage], {
       network: 'foreign',
       nonce: nonce++,
     })
@@ -63,7 +59,7 @@ async function deployForeign() {
 
   console.log('\nForeign part of OMNIBRIDGE has been deployed\n')
   return {
-    foreignBridgeMediator: { address: foreignBridgeStorage.options.address },
+    foreignBridgeMediator: { address: storageAddress },
     tokenFactory: { address: tokenFactory },
   }
 }

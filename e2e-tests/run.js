@@ -105,7 +105,7 @@ async function deployWETHRouter(web3, options, bridge, WETH, owner) {
 }
 
 async function deployInterestImpl(web3, mediator, owner, cToken, options) {
-  const args = [toAddress(mediator), owner, '1', owner]
+  const args = [toAddress(mediator), '1', owner]
   const contract = await deploy(web3, options, InterestImpl.abi, InterestImpl.bytecode, args)
   await contract.methods.enableInterestToken(toAddress(cToken), toWei('1'), owner, toWei('1')).send({ from: owner })
   console.log(`Deployed Interest implementation contract ${contract.options.address}`)

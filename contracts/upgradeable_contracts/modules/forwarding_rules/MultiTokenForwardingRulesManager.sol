@@ -1,12 +1,12 @@
 pragma solidity 0.7.5;
 
-import "../OwnableModule.sol";
+import "../OmnibridgeModule.sol";
 
 /**
  * @title MultiTokenForwardingRulesManager
  * @dev Multi token mediator functionality for managing destination AMB lanes permissions.
  */
-contract MultiTokenForwardingRulesManager is OwnableModule {
+contract MultiTokenForwardingRulesManager is OmnibridgeModule {
     address internal constant ANY_ADDRESS = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
 
     // Forwarding rules mapping
@@ -15,7 +15,7 @@ contract MultiTokenForwardingRulesManager is OwnableModule {
 
     event ForwardingRuleUpdated(address token, address sender, address receiver, int256 lane);
 
-    constructor(address _owner) OwnableModule(_owner) {}
+    constructor(IOwnable _mediator) OmnibridgeModule(_mediator) {}
 
     /**
      * @dev Tells the destination lane for a particular bridge operation by checking several wildcard forwarding rules.

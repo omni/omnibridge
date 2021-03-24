@@ -5,7 +5,6 @@ const {
   HOME_ERC677_TOKEN_IMAGE,
   HOME_TOKEN_FACTORY,
   HOME_FORWARDING_RULES_MANAGER,
-  HOME_BRIDGE_OWNER,
   HOME_REWARDABLE,
   HOME_TRANSACTIONS_FEE,
   FOREIGN_TRANSACTIONS_FEE,
@@ -33,7 +32,8 @@ async function deployHome() {
   const homeBridgeStorage = await deployContract(EternalStorageProxy, [], {
     nonce: nonce++,
   })
-  console.log('[Home] Bridge Mediator Storage: ', homeBridgeStorage.options.address)
+  const storageAddress = homeBridgeStorage.options.address
+  console.log('[Home] Bridge Mediator Storage: ', storageAddress)
 
   let tokenFactory = HOME_TOKEN_FACTORY
   if (!tokenFactory) {
@@ -50,7 +50,7 @@ async function deployHome() {
       console.log('\n[Home] Using existing ERC677 token image: ', homeTokenImage)
     }
     console.log('\n[Home] Deploying new token factory')
-    const factory = await deployContract(TokenFactory, [HOME_BRIDGE_OWNER, homeTokenImage], {
+    const factory = await deployContract(TokenFactory, [storageAddress, homeTokenImage], {
       nonce: nonce++,
     })
     tokenFactory = factory.options.address
@@ -71,7 +71,7 @@ async function deployHome() {
     `)
     const manager = await deployContract(
       OmnibridgeFeeManager,
-      [homeBridgeStorage.options.address, HOME_BRIDGE_OWNER, rewardList, [homeFeeInWei, foreignFeeInWei]],
+      [storageAddress, rewardList, [homeFeeInWei, foreignFeeInWei]],
       { nonce: nonce++ }
     )
     feeManager = manager.options.address
@@ -81,9 +81,9 @@ async function deployHome() {
   let forwardingRulesManager = HOME_FORWARDING_RULES_MANAGER === false ? ZERO_ADDRESS : HOME_FORWARDING_RULES_MANAGER
   if (forwardingRulesManager === '') {
     console.log(`\n[Home] Deploying Forwarding Rules Manager contract with the following parameters:
-    OWNER: ${HOME_BRIDGE_OWNER}
+    MEDIATOR: ${storageAddress}
     `)
-    const manager = await deployContract(MultiTokenForwardingRulesManager, [HOME_BRIDGE_OWNER], { nonce: nonce++ })
+    const manager = await deployContract(MultiTokenForwardingRulesManager, [storageAddress], { nonce: nonce++ })
     forwardingRulesManager = manager.options.address
     console.log('\n[Home] New Forwarding Rules Manager has been deployed: ', forwardingRulesManager)
   } else {
@@ -92,11 +92,11 @@ async function deployHome() {
 
   console.log(`\n[Home] Deploying gas limit manager contract with the following parameters:
     HOME_AMB_BRIDGE: ${HOME_AMB_BRIDGE}
-    OWNER: ${HOME_BRIDGE_OWNER}
+    MEDIATOR: ${storageAddress}
   `)
   const gasLimitManager = await deployContract(
     SelectorTokenGasLimitManager,
-    [HOME_AMB_BRIDGE, HOME_BRIDGE_OWNER, HOME_MEDIATOR_REQUEST_GAS_LIMIT],
+    [HOME_AMB_BRIDGE, storageAddress, HOME_MEDIATOR_REQUEST_GAS_LIMIT],
     { nonce: nonce++ }
   )
   console.log('\n[Home] New Gas Limit Manager has been deployed: ', gasLimitManager.options.address)
@@ -120,7 +120,7 @@ async function deployHome() {
 
   console.log('\nHome part of OMNIBRIDGE has been deployed\n')
   return {
-    homeBridgeMediator: { address: homeBridgeStorage.options.address },
+    homeBridgeMediator: { address: storageAddress },
     tokenFactory: { address: tokenFactory },
     feeManager: { address: feeManager },
     gasLimitManager: { address: gasLimitManager.options.address },

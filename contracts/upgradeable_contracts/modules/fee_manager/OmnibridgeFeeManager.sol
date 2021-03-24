@@ -3,14 +3,14 @@ pragma solidity 0.7.5;
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "../MediatorOwnableModule.sol";
+import "../OmnibridgeModule.sol";
 
 /**
  * @title OmnibridgeFeeManager
  * @dev Implements the logic to distribute fees from the Omnibridge mediator contract operations.
  * The fees are distributed in the form of ERC20/ERC677 tokens to the list of reward addresses.
  */
-contract OmnibridgeFeeManager is MediatorOwnableModule {
+contract OmnibridgeFeeManager is OmnibridgeModule {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -31,17 +31,15 @@ contract OmnibridgeFeeManager is MediatorOwnableModule {
     /**
      * @dev Stores the initial parameters of the fee manager.
      * @param _mediator address of the mediator contract used together with this fee manager.
-     * @param _owner address of the contract owner.
      * @param _rewardAddresses list of unique initial reward addresses, between whom fees will be distributed
      * @param _fees array with initial fees for both bridge directions.
      *   [ 0 = homeToForeignFee, 1 = foreignToHomeFee ]
      */
     constructor(
-        address _mediator,
-        address _owner,
+        IOwnable _mediator,
         address[] memory _rewardAddresses,
         uint256[2] memory _fees
-    ) MediatorOwnableModule(_mediator, _owner) {
+    ) OmnibridgeModule(_mediator) {
         require(_rewardAddresses.length <= MAX_REWARD_ACCOUNTS);
         _setFee(HOME_TO_FOREIGN_FEE, address(0), _fees[0]);
         _setFee(FOREIGN_TO_HOME_FEE, address(0), _fees[1]);
