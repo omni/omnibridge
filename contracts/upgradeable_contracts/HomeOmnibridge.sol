@@ -119,6 +119,10 @@ contract HomeOmnibridge is
         address _recipient,
         uint256 _value
     ) internal override {
+        // prohibit withdrawal of tokens during other bridge operations (e.g. relayTokens)
+        // such reentrant withdrawal can lead to an incorrect balanceDiff calculation
+        require(!lock());
+
         require(withinExecutionLimit(_token, _value));
         addTotalExecutedPerDay(_token, getCurrentDay(), _value);
 
