@@ -31,7 +31,7 @@ contract OmnibridgeInfo is VersionableBridge {
             uint64 patch
         )
     {
-        return (2, 1, 0);
+        return (3, 0, 0);
     }
 
     /**
