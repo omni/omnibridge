@@ -249,8 +249,7 @@ abstract contract BasicOmnibridge is
         }
         addTotalSpentPerDay(_token, getCurrentDay(), diff);
 
-        uint8 decimals = uint8(TokenReader.readDecimals(_token));
-        bytes memory data = _prepareMessage(address(0), _token, _receiver, diff, decimals, new bytes(0));
+        bytes memory data = _prepareMessage(address(0), _token, _receiver, diff, new bytes(0));
         bytes32 _messageId = _passMessage(data, true);
         _recordBridgeOperation(_messageId, _token, _receiver, diff);
     }
@@ -309,7 +308,6 @@ abstract contract BasicOmnibridge is
      * @param _token bridged token address.
      * @param _receiver address of the tokens receiver on the other side.
      * @param _value bridged value.
-     * @param _decimals token decimals parameter.
      * @param _data additional transfer data passed from the other side.
      */
     function _prepareMessage(
@@ -317,7 +315,6 @@ abstract contract BasicOmnibridge is
         address _token,
         address _receiver,
         uint256 _value,
-        uint8 _decimals,
         bytes memory _data
     ) internal returns (bytes memory) {
         bool withData = _data.length > 0 || msg.sig == this.relayTokensAndCall.selector;
@@ -340,6 +337,7 @@ abstract contract BasicOmnibridge is
                         : abi.encodeWithSelector(this.handleBridgedTokens.selector, _token, _receiver, _value);
             }
 
+            uint8 decimals = TokenReader.readDecimals(_token);
             string memory name = TokenReader.readName(_token);
             string memory symbol = TokenReader.readSymbol(_token);
 
@@ -352,7 +350,7 @@ abstract contract BasicOmnibridge is
                         _token,
                         name,
                         symbol,
-                        _decimals,
+                        decimals,
                         _receiver,
                         _value,
                         _data
@@ -362,7 +360,7 @@ abstract contract BasicOmnibridge is
                         _token,
                         name,
                         symbol,
-                        _decimals,
+                        decimals,
                         _receiver,
                         _value
                     );

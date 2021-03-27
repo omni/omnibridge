@@ -58,7 +58,7 @@ library TokenReader {
      * @param _token address of the token contract.
      * @return token decimals or 0 if none of the methods succeeded.
      */
-    function readDecimals(address _token) internal view returns (uint256) {
+    function readDecimals(address _token) internal view returns (uint8) {
         (bool status, bytes memory data) = _token.staticcall(abi.encodeWithSelector(ITokenDetails.decimals.selector));
         if (!status) {
             (status, data) = _token.staticcall(abi.encodeWithSelector(ITokenDetails.DECIMALS.selector));
@@ -66,7 +66,7 @@ library TokenReader {
                 return 0;
             }
         }
-        return abi.decode(data, (uint256));
+        return abi.decode(data, (uint8));
     }
 
     /**
