@@ -2,6 +2,7 @@ pragma solidity 0.7.5;
 
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "../../../interfaces/IBurnableMintableERC677Token.sol";
+import "../../../libraries/SafeMint.sol";
 import "../../Ownable.sol";
 import "./OmnibridgeFeeManager.sol";
 
@@ -11,6 +12,7 @@ import "./OmnibridgeFeeManager.sol";
  */
 abstract contract OmnibridgeFeeManagerConnector is Ownable {
     using SafeERC20 for IERC20;
+    using SafeMint for IBurnableMintableERC677Token;
 
     bytes32 internal constant FEE_MANAGER_CONTRACT = 0x779a349c5bee7817f04c960f525ee3e2f2516078c38c68a3149787976ee837e5; // keccak256(abi.encodePacked("feeManagerContract"))
     bytes32 internal constant HOME_TO_FOREIGN_FEE = 0x741ede137d0537e88e0ea0ff25b1f22d837903dbbee8980b4a06e8523247ee26; // keccak256(abi.encodePacked("homeToForeignFee"))
@@ -71,7 +73,7 @@ abstract contract OmnibridgeFeeManagerConnector is Ownable {
             uint256 fee = manager.calculateFee(_feeType, _token, _value);
             if (fee > 0) {
                 if (_feeType == FOREIGN_TO_HOME_FEE && !_isNative) {
-                    IBurnableMintableERC677Token(_token).mint(address(manager), fee);
+                    IBurnableMintableERC677Token(_token).safeMint(address(manager), fee);
                 } else {
                     IERC20(_token).safeTransfer(address(manager), fee);
                 }

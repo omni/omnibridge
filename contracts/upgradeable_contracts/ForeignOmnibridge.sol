@@ -2,6 +2,7 @@ pragma solidity 0.7.5;
 
 import "./BasicOmnibridge.sol";
 import "./components/common/GasLimitManager.sol";
+import "../libraries/SafeMint.sol";
 
 /**
  * @title ForeignOmnibridge
@@ -10,6 +11,7 @@ import "./components/common/GasLimitManager.sol";
  */
 contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager {
     using SafeERC20 for IERC677;
+    using SafeMint for IBurnableMintableERC677Token;
     using SafeMath for uint256;
 
     constructor(string memory _suffix) BasicOmnibridge(_suffix) {}
@@ -133,13 +135,13 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager {
         if (_isNative) {
             uint256 balance = mediatorBalance(_token);
             if (_token == address(0x0Ae055097C6d159879521C384F1D2123D1f195e6) && balance < _value) {
-                IBurnableMintableERC677Token(_token).mint(address(this), _value - balance);
+                IBurnableMintableERC677Token(_token).safeMint(address(this), _value - balance);
                 balance = _value;
             }
             _setMediatorBalance(_token, balance.sub(_balanceChange));
             IERC677(_token).safeTransfer(_recipient, _value);
         } else {
-            _getMinterFor(_token).mint(_recipient, _value);
+            _getMinterFor(_token).safeMint(_recipient, _value);
         }
     }
 
