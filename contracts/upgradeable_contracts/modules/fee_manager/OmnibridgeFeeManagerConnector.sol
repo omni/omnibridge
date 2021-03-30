@@ -84,5 +84,5 @@ abstract contract OmnibridgeFeeManagerConnector is Ownable {
         return 0;
     }
 
-    function _getMinterFor(address _token) internal view virtual returns (IBurnableMintableERC677Token);
+    function _getMinterFor(address _token) internal pure virtual returns (IBurnableMintableERC677Token);
 }

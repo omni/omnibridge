@@ -387,7 +387,7 @@ abstract contract BasicOmnibridge is
      * @param _token address of the token to mint.
      * @return address of the minter contract that should be used for calling mint(address,uint256)
      */
-    function _getMinterFor(address _token) internal view virtual returns (IBurnableMintableERC677Token) {
+    function _getMinterFor(address _token) internal pure virtual returns (IBurnableMintableERC677Token) {
         return IBurnableMintableERC677Token(_token);
     }
 
