@@ -3,6 +3,7 @@ pragma solidity 0.7.5;
 import "../interfaces/IOmnibridge.sol";
 import "../interfaces/IWETH.sol";
 import "../libraries/AddressHelper.sol";
+import "../libraries/Bytes.sol";
 import "../upgradeable_contracts/modules/OwnableModule.sol";
 import "../upgradeable_contracts/Claimable.sol";
 
@@ -62,7 +63,7 @@ contract WETHOmnibridgeRouter is OwnableModule, Claimable {
     function onTokenBridged(
         address _token,
         uint256 _value,
-        bytes calldata _data
+        bytes memory _data
     ) external {
         require(_token == address(WETH));
         require(msg.sender == address(bridge));
@@ -70,11 +71,7 @@ contract WETHOmnibridgeRouter is OwnableModule, Claimable {
 
         WETH.withdraw(_value);
 
-        address payable receiver;
-        assembly {
-            receiver := calldataload(120)
-        }
-        AddressHelper.safeSendValue(receiver, _value);
+        AddressHelper.safeSendValue(payable(Bytes.bytesToAddress(_data)), _value);
     }
 
     /**
