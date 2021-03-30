@@ -77,7 +77,7 @@ abstract contract OmnibridgeFeeManagerConnector is Ownable {
                 } else {
                     IBurnableMintableERC677Token(_token).transfer(address(manager), fee);
                 }
-                manager.distributeFee(_token, fee);
+                manager.distributeFee(_token);
             }
             return fee;
         }
