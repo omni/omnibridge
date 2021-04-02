@@ -16,6 +16,7 @@ import "../interfaces/IBurnableMintableERC677Token.sol";
 import "../interfaces/IERC20Metadata.sol";
 import "../interfaces/IERC20Receiver.sol";
 import "../libraries/TokenReader.sol";
+import "../libraries/SafeMint.sol";
 
 /**
  * @title BasicOmnibridge
@@ -35,6 +36,7 @@ abstract contract BasicOmnibridge is
     TokensBridgeLimits
 {
     using SafeERC20 for IERC677;
+    using SafeMint for IBurnableMintableERC677Token;
     using SafeMath for uint256;
 
     // Workaround for storing variable up-to-32 bytes suffix
@@ -219,7 +221,7 @@ abstract contract BasicOmnibridge is
         require(nativeTokenAddress(_bridgedToken) == address(0));
         require(bridgedTokenAddress(_nativeToken) == address(0));
 
-        IBurnableMintableERC677Token(_bridgedToken).mint(address(this), 1);
+        IBurnableMintableERC677Token(_bridgedToken).safeMint(address(this), 1);
         IBurnableMintableERC677Token(_bridgedToken).burn(1);
 
         _setTokenAddressPair(_nativeToken, _bridgedToken);
@@ -410,7 +412,7 @@ abstract contract BasicOmnibridge is
             IERC677(_token).safeTransfer(_recipient, _value);
             _setMediatorBalance(_token, mediatorBalance(_token).sub(_balanceChange));
         } else {
-            _getMinterFor(_token).mint(_recipient, _value);
+            _getMinterFor(_token).safeMint(_recipient, _value);
         }
     }
 
