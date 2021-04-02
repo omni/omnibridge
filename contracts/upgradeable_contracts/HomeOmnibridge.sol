@@ -152,21 +152,20 @@ contract HomeOmnibridge is
     ) internal override {
         require(_receiver != address(0) && _receiver != mediatorContractOnOtherSide());
 
-        uint8 decimals = uint8(TokenReader.readDecimals(_token));
-        address nativeToken = nativeTokenAddress(_token);
-
         // native unbridged token
         if (!isTokenRegistered(_token)) {
+            uint8 decimals = TokenReader.readDecimals(_token);
             _initializeTokenBridgeLimits(_token, decimals);
         }
 
         require(withinLimit(_token, _value));
         addTotalSpentPerDay(_token, getCurrentDay(), _value);
 
+        address nativeToken = nativeTokenAddress(_token);
         uint256 fee = _distributeFee(HOME_TO_FOREIGN_FEE, nativeToken == address(0), _from, _token, _value);
         uint256 valueToBridge = _value.sub(fee);
 
-        bytes memory data = _prepareMessage(nativeToken, _token, _receiver, valueToBridge, decimals, _data);
+        bytes memory data = _prepareMessage(nativeToken, _token, _receiver, valueToBridge, _data);
 
         // Address of the home token is used here for determining lane permissions.
         bytes32 _messageId = _passMessage(data, _isOracleDrivenLaneAllowed(_token, _from, _receiver));
