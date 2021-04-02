@@ -220,6 +220,11 @@ abstract contract BasicOmnibridge is
         require(!isTokenRegistered(_bridgedToken));
         require(nativeTokenAddress(_bridgedToken) == address(0));
         require(bridgedTokenAddress(_nativeToken) == address(0));
+        // Unfortunately, there is no simple way to verify that the _nativeToken address
+        // does not belong to the bridged token on the other side,
+        // since information about bridged tokens addresses is not transferred back.
+        // Therefore, owner account calling this function SHOULD manually verify on the other side of the bridge that
+        // nativeTokenAddress(_nativeToken) == address(0) && isTokenRegistered(_nativeToken) == false.
 
         IBurnableMintableERC677Token(_bridgedToken).safeMint(address(this), 1);
         IBurnableMintableERC677Token(_bridgedToken).burn(1);
