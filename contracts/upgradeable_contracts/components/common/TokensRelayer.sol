@@ -24,22 +24,18 @@ abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard {
     function onTokenTransfer(
         address _from,
         uint256 _value,
-        bytes calldata _data
+        bytes memory _data
     ) external returns (bool) {
         if (!lock()) {
             bytes memory data = new bytes(0);
             address receiver = _from;
             if (_data.length >= 20) {
-                assembly {
-                    receiver := calldataload(120)
-                }
+                receiver = Bytes.bytesToAddress(_data);
                 if (_data.length > 20) {
                     assembly {
-                        data := mload(0x40)
-                        let size := sub(calldataload(100), 20)
+                        let size := sub(mload(_data), 20)
+                        data := add(_data, 20)
                         mstore(data, size)
-                        calldatacopy(add(data, 32), 152, size)
-                        mstore(0x40, add(add(data, 32), size))
                     }
                 }
             }
