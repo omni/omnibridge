@@ -36,7 +36,8 @@ contract Ownable is EternalStorage {
      * @dev Throws if called through proxy by any account other than contract itself or an upgradeability owner.
      */
     modifier onlyRelevantSender() {
-        (bool isProxy, bytes memory returnData) = address(this).call(abi.encodeWithSelector(UPGRADEABILITY_OWNER));
+        (bool isProxy, bytes memory returnData) =
+            address(this).staticcall(abi.encodeWithSelector(UPGRADEABILITY_OWNER));
         require(
             !isProxy || // covers usage without calling through storage proxy
                 (returnData.length == 32 && msg.sender == abi.decode(returnData, (address))) || // covers usage through regular proxy calls
