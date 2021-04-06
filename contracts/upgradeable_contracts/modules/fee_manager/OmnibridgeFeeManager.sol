@@ -189,13 +189,13 @@ contract OmnibridgeFeeManager is MediatorOwnableModule {
     /**
      * @dev Distributes the fee proportionally between registered reward addresses.
      * @param _token address of the token contract for which fee should be distributed.
-     * @param _fee fee amount to distribute.
      */
-    function distributeFee(address _token, uint256 _fee) external onlyMediator {
+    function distributeFee(address _token) external onlyMediator {
         uint256 numOfAccounts = rewardAddresses.length;
-        uint256 feePerAccount = _fee.div(numOfAccounts);
+        uint256 fee = IERC20(_token).balanceOf(address(this));
+        uint256 feePerAccount = fee.div(numOfAccounts);
         uint256 randomAccountIndex;
-        uint256 diff = _fee.sub(feePerAccount.mul(numOfAccounts));
+        uint256 diff = fee.sub(feePerAccount.mul(numOfAccounts));
         if (diff > 0) {
             randomAccountIndex = random(numOfAccounts);
         }
