@@ -16,6 +16,7 @@ import "../interfaces/IBurnableMintableERC677Token.sol";
 import "../interfaces/IERC20Metadata.sol";
 import "../interfaces/IERC20Receiver.sol";
 import "../libraries/TokenReader.sol";
+import "../libraries/SafeMint.sol";
 
 /**
  * @title BasicOmnibridge
@@ -35,6 +36,7 @@ abstract contract BasicOmnibridge is
     TokensBridgeLimits
 {
     using SafeERC20 for IERC677;
+    using SafeMint for IBurnableMintableERC677Token;
     using SafeMath for uint256;
 
     // Workaround for storing variable up-to-32 bytes suffix
@@ -218,8 +220,13 @@ abstract contract BasicOmnibridge is
         require(!isTokenRegistered(_bridgedToken));
         require(nativeTokenAddress(_bridgedToken) == address(0));
         require(bridgedTokenAddress(_nativeToken) == address(0));
+        // Unfortunately, there is no simple way to verify that the _nativeToken address
+        // does not belong to the bridged token on the other side,
+        // since information about bridged tokens addresses is not transferred back.
+        // Therefore, owner account calling this function SHOULD manually verify on the other side of the bridge that
+        // nativeTokenAddress(_nativeToken) == address(0) && isTokenRegistered(_nativeToken) == false.
 
-        IBurnableMintableERC677Token(_bridgedToken).mint(address(this), 1);
+        IBurnableMintableERC677Token(_bridgedToken).safeMint(address(this), 1);
         IBurnableMintableERC677Token(_bridgedToken).burn(1);
 
         _setTokenAddressPair(_nativeToken, _bridgedToken);
@@ -249,8 +256,7 @@ abstract contract BasicOmnibridge is
         }
         addTotalSpentPerDay(_token, getCurrentDay(), diff);
 
-        uint8 decimals = uint8(TokenReader.readDecimals(_token));
-        bytes memory data = _prepareMessage(address(0), _token, _receiver, diff, decimals, new bytes(0));
+        bytes memory data = _prepareMessage(address(0), _token, _receiver, diff, new bytes(0));
         bytes32 _messageId = _passMessage(data, true);
         _recordBridgeOperation(_messageId, _token, _receiver, diff);
     }
@@ -309,7 +315,6 @@ abstract contract BasicOmnibridge is
      * @param _token bridged token address.
      * @param _receiver address of the tokens receiver on the other side.
      * @param _value bridged value.
-     * @param _decimals token decimals parameter.
      * @param _data additional transfer data passed from the other side.
      */
     function _prepareMessage(
@@ -317,7 +322,6 @@ abstract contract BasicOmnibridge is
         address _token,
         address _receiver,
         uint256 _value,
-        uint8 _decimals,
         bytes memory _data
     ) internal returns (bytes memory) {
         bool withData = _data.length > 0 || msg.sig == this.relayTokensAndCall.selector;
@@ -340,6 +344,7 @@ abstract contract BasicOmnibridge is
                         : abi.encodeWithSelector(this.handleBridgedTokens.selector, _token, _receiver, _value);
             }
 
+            uint8 decimals = TokenReader.readDecimals(_token);
             string memory name = TokenReader.readName(_token);
             string memory symbol = TokenReader.readSymbol(_token);
 
@@ -352,7 +357,7 @@ abstract contract BasicOmnibridge is
                         _token,
                         name,
                         symbol,
-                        _decimals,
+                        decimals,
                         _receiver,
                         _value,
                         _data
@@ -362,7 +367,7 @@ abstract contract BasicOmnibridge is
                         _token,
                         name,
                         symbol,
-                        _decimals,
+                        decimals,
                         _receiver,
                         _value
                     );
@@ -410,7 +415,7 @@ abstract contract BasicOmnibridge is
             IERC677(_token).safeTransfer(_recipient, _value);
             _setMediatorBalance(_token, mediatorBalance(_token).sub(_balanceChange));
         } else {
-            _getMinterFor(_token).mint(_recipient, _value);
+            _getMinterFor(_token).safeMint(_recipient, _value);
         }
     }
 

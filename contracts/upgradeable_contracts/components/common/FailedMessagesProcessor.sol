@@ -16,9 +16,10 @@ abstract contract FailedMessagesProcessor is BasicAMBMediator, BridgeOperationsS
      * @param _messageId id of the message which execution failed.
      */
     function requestFailedMessageFix(bytes32 _messageId) external {
-        require(!bridgeContract().messageCallStatus(_messageId));
-        require(bridgeContract().failedMessageReceiver(_messageId) == address(this));
-        require(bridgeContract().failedMessageSender(_messageId) == mediatorContractOnOtherSide());
+        IAMB bridge = bridgeContract();
+        require(!bridge.messageCallStatus(_messageId));
+        require(bridge.failedMessageReceiver(_messageId) == address(this));
+        require(bridge.failedMessageSender(_messageId) == mediatorContractOnOtherSide());
 
         bytes4 methodSelector = this.fixFailedMessage.selector;
         bytes memory data = abi.encodeWithSelector(methodSelector, _messageId);
