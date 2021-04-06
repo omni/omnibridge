@@ -229,8 +229,9 @@ abstract contract BasicOmnibridge is
      * @dev Allows to send to the other network the amount of locked tokens that can be forced into the contract
      * without the invocation of the required methods. (e. g. regular transfer without a call to onTokenTransfer)
      * @param _token address of the token contract.
-     * This method SHOULD not be called for tokens with double addresses
-     * (e.g. TUSD accessible at both 0x8dd5fbCe2F6a956C3022bA3663759011Dd51e73E and 0x0000000000085d4780B73119b644AE5ecd22b376)
+     * Before calling this method, it must be carefully investigated how imbalance happened
+     * in order to avoid an attempt to steal the funds from a token with double addresses
+     * (e.g. TUSD is accessible at both 0x8dd5fbCe2F6a956C3022bA3663759011Dd51e73E and 0x0000000000085d4780B73119b644AE5ecd22b376)
      * @param _receiver the address that will receive the tokens on the other network.
      */
     function fixMediatorBalance(address _token, address _receiver)
