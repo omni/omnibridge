@@ -209,6 +209,10 @@ contract HomeOmnibridge is
         // It is possible to hardcode different token minter contracts here during compile time.
         // For example, the dedicated TokenMinter (0x857DD07866C1e19eb2CDFceF7aE655cE7f9E560d) is used for
         // bridged STAKE token (0xb7D311E2Eb55F2f68a9440da38e7989210b9A05e).
+        if (_token == address(0xb7D311E2Eb55F2f68a9440da38e7989210b9A05e)) {
+            // hardcoded address of the TokenMinter address
+            return IBurnableMintableERC677Token(0xb7D311E2Eb55F2f68a9440da38e7989210b9A05e);
+        }
         return IBurnableMintableERC677Token(_token);
     }
 }
