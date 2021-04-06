@@ -19,6 +19,7 @@ abstract contract OmnibridgeFeeManagerConnector is Ownable {
     bytes32 internal constant FOREIGN_TO_HOME_FEE = 0x03be2b2875cb41e0e77355e802a16769bb8dfcf825061cde185c73bf94f12625; // keccak256(abi.encodePacked("foreignToHomeFee"))
 
     event FeeDistributed(uint256 fee, address indexed token, bytes32 indexed messageId);
+    event FeeDistributionFailed(address indexed token, uint256 fee);
 
     /**
      * @dev Updates an address of the used fee manager contract used for calculating and distributing fees.
@@ -72,10 +73,23 @@ abstract contract OmnibridgeFeeManagerConnector is Ownable {
             }
             uint256 fee = manager.calculateFee(_feeType, _token, _value);
             if (fee > 0) {
-                if (_feeType == FOREIGN_TO_HOME_FEE && !_isNative) {
-                    IBurnableMintableERC677Token(_token).safeMint(address(manager), fee);
-                } else {
+                if (_feeType == HOME_TO_FOREIGN_FEE) {
+                    // for home -> foreign direction, fee is collected using transfer(address,uint256) method
+                    // if transfer to the manager contract fails, the transaction is reverted
                     IERC20(_token).safeTransfer(address(manager), fee);
+                } else {
+                    // for foreign -> home direction,
+                    // fee is collected using transfer(address,uint256) method for native tokens,
+                    // and using mint(address,uint256) method for bridged tokens.
+                    // if transfer/mint to the manager contract fails, the message still will be processed, but without fees
+                    bytes4 selector = _isNative ? IERC20.transfer.selector : IBurnableMintableERC677Token.mint.selector;
+                    (bool status, bytes memory returnData) =
+                        _token.call(abi.encodeWithSelector(selector, manager, fee));
+                    if (!status) {
+                        emit FeeDistributionFailed(_token, fee);
+                        return 0;
+                    }
+                    require(returnData.length == 0 || abi.decode(returnData, (bool)));
                 }
                 manager.distributeFee(_token);
             }
