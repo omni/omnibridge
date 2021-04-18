@@ -42,7 +42,7 @@ contract Claimable {
     }
 
     /**
-     * @dev Internal function for withdrawing all tokens of ssome particular ERC20 contract from this contract.
+     * @dev Internal function for withdrawing all tokens of some particular ERC20 contract from this contract.
      * @param _token address of the claimed ERC20 token.
      * @param _to address of the tokens receiver.
      */

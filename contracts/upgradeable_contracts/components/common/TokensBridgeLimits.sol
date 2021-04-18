@@ -6,7 +6,7 @@ import "../../Ownable.sol";
 
 /**
  * @title TokensBridgeLimits
- * @dev Functionality for keeping track of bridgin limits for multiple tokens.
+ * @dev Functionality for keeping track of bridging limits for multiple tokens.
  */
 contract TokensBridgeLimits is EternalStorage, Ownable {
     using SafeMath for uint256;

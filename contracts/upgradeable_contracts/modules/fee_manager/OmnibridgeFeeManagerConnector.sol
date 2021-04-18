@@ -30,7 +30,7 @@ abstract contract OmnibridgeFeeManagerConnector is Ownable {
     }
 
     /**
-     * @dev Retrieves an address of the fee manager cosntract.
+     * @dev Retrieves an address of the fee manager contract.
      * @return address of the fee manager contract.
      */
     function feeManager() public view returns (OmnibridgeFeeManager) {
