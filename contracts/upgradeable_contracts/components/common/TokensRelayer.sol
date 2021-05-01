@@ -1,5 +1,6 @@
 pragma solidity 0.7.5;
 
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "../../../interfaces/IERC677.sol";
 import "../../../libraries/Bytes.sol";
@@ -11,6 +12,7 @@ import "../../BasicAMBMediator.sol";
  * @dev Functionality for bridging multiple tokens to the other side of the bridge.
  */
 abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard {
+    using SafeMath for uint256;
     using SafeERC20 for IERC677;
 
     /**
@@ -22,24 +24,18 @@ abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard {
     function onTokenTransfer(
         address _from,
         uint256 _value,
-        bytes calldata _data
+        bytes memory _data
     ) external returns (bool) {
         if (!lock()) {
             bytes memory data = new bytes(0);
             address receiver = _from;
             if (_data.length >= 20) {
-                assembly {
-                    receiver := calldataload(120)
-                }
-                require(receiver != address(0));
-                require(receiver != mediatorContractOnOtherSide());
+                receiver = Bytes.bytesToAddress(_data);
                 if (_data.length > 20) {
                     assembly {
-                        data := mload(0x40)
-                        let size := sub(calldataload(100), 20)
+                        let size := sub(mload(_data), 20)
+                        data := add(_data, 20)
                         mstore(data, size)
-                        calldatacopy(add(data, 32), 152, size)
-                        mstore(0x40, add(add(data, 32), size))
                     }
                 }
             }
@@ -110,10 +106,13 @@ abstract contract TokensRelayer is BasicAMBMediator, ReentrancyGuard {
         // which will call passMessage.
         require(!lock());
 
+        uint256 balanceBefore = token.balanceOf(address(this));
         setLock(true);
         token.safeTransferFrom(msg.sender, address(this), _value);
         setLock(false);
-        bridgeSpecificActionsOnTokenTransfer(address(token), msg.sender, _receiver, _value, _data);
+        uint256 balanceDiff = token.balanceOf(address(this)).sub(balanceBefore);
+        require(balanceDiff <= _value);
+        bridgeSpecificActionsOnTokenTransfer(address(token), msg.sender, _receiver, balanceDiff, _data);
     }
 
     function bridgeSpecificActionsOnTokenTransfer(

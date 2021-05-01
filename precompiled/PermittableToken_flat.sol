@@ -681,9 +681,7 @@ contract ERC677BridgeToken is IBurnableMintableERC677Token, DetailedERC20, Burna
 
     address internal bridgeContractAddr;
 
-    constructor(string _name, string _symbol, uint8 _decimals) public DetailedERC20(_name, _symbol, _decimals) {
-        // solhint-disable-previous-line no-empty-blocks
-    }
+    constructor(string _name, string _symbol, uint8 _decimals) public DetailedERC20(_name, _symbol, _decimals) {}
 
     function bridgeContract() external view returns (address) {
         return bridgeContractAddr;

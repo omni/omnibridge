@@ -2,6 +2,7 @@ pragma solidity 0.7.5;
 
 import "./BasicOmnibridge.sol";
 import "./components/common/GasLimitManager.sol";
+import "../libraries/SafeMint.sol";
 
 /**
  * @title ForeignOmnibridge
@@ -10,7 +11,10 @@ import "./components/common/GasLimitManager.sol";
  */
 contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager {
     using SafeERC20 for IERC677;
+    using SafeMint for IBurnableMintableERC677Token;
     using SafeMath for uint256;
+
+    constructor(string memory _suffix) BasicOmnibridge(_suffix) {}
 
     /**
      * @dev Stores the initial parameters of the mediator.
@@ -73,6 +77,10 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager {
         address _recipient,
         uint256 _value
     ) internal override {
+        // prohibit withdrawal of tokens during other bridge operations (e.g. relayTokens)
+        // such reentrant withdrawal can lead to an incorrect balanceDiff calculation
+        require(!lock());
+
         require(withinExecutionLimit(_token, _value));
         addTotalExecutedPerDay(_token, getCurrentDay(), _value);
 
@@ -98,17 +106,16 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager {
     ) internal virtual override {
         require(_receiver != address(0) && _receiver != mediatorContractOnOtherSide());
 
-        uint8 decimals = uint8(TokenReader.readDecimals(_token));
-
         // native unbridged token
         if (!isTokenRegistered(_token)) {
+            uint8 decimals = TokenReader.readDecimals(_token);
             _initializeTokenBridgeLimits(_token, decimals);
         }
 
         require(withinLimit(_token, _value));
         addTotalSpentPerDay(_token, getCurrentDay(), _value);
 
-        bytes memory data = _prepareMessage(nativeTokenAddress(_token), _token, _receiver, _value, decimals, _data);
+        bytes memory data = _prepareMessage(nativeTokenAddress(_token), _token, _receiver, _value, _data);
         bytes32 _messageId = _passMessage(data, true);
         _recordBridgeOperation(_messageId, _token, _from, _value);
     }
@@ -131,23 +138,14 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager {
         if (_isNative) {
             uint256 balance = mediatorBalance(_token);
             if (_token == address(0x0Ae055097C6d159879521C384F1D2123D1f195e6) && balance < _value) {
-                IBurnableMintableERC677Token(_token).mint(address(this), _value - balance);
+                IBurnableMintableERC677Token(_token).safeMint(address(this), _value - balance);
                 balance = _value;
             }
             _setMediatorBalance(_token, balance.sub(_balanceChange));
             IERC677(_token).safeTransfer(_recipient, _value);
         } else {
-            _getMinterFor(_token).mint(_recipient, _value);
+            _getMinterFor(_token).safeMint(_recipient, _value);
         }
-    }
-
-    /**
-     * @dev Internal function for transforming the bridged token name. Appends a side-specific suffix.
-     * @param _name bridged token from the other side.
-     * @return token name for this side of the bridge.
-     */
-    function _transformName(string memory _name) internal pure override returns (string memory) {
-        return string(abi.encodePacked(_name, " on Mainnet"));
     }
 
     /**
@@ -158,8 +156,7 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager {
      */
     function _passMessage(bytes memory _data, bool _useOracleLane) internal override returns (bytes32) {
         (_useOracleLane);
-        uint256 gasLimit = _chooseRequestGasLimit(_data);
 
-        return bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), _data, gasLimit);
+        return bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), _data, requestGasLimit());
     }
 }

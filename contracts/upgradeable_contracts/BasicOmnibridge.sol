@@ -16,6 +16,7 @@ import "../interfaces/IBurnableMintableERC677Token.sol";
 import "../interfaces/IERC20Metadata.sol";
 import "../interfaces/IERC20Receiver.sol";
 import "../libraries/TokenReader.sol";
+import "../libraries/SafeMint.sol";
 
 /**
  * @title BasicOmnibridge
@@ -35,7 +36,23 @@ abstract contract BasicOmnibridge is
     TokensBridgeLimits
 {
     using SafeERC20 for IERC677;
+    using SafeMint for IBurnableMintableERC677Token;
     using SafeMath for uint256;
+
+    // Workaround for storing variable up-to-32 bytes suffix
+    uint256 private immutable SUFFIX_SIZE;
+    bytes32 private immutable SUFFIX;
+
+    // Since contract is intended to be deployed under EternalStorageProxy, only constant and immutable variables can be set here
+    constructor(string memory _suffix) {
+        require(bytes(_suffix).length <= 32);
+        bytes32 suffix;
+        assembly {
+            suffix := mload(add(_suffix, 32))
+        }
+        SUFFIX = suffix;
+        SUFFIX_SIZE = bytes(_suffix).length;
+    }
 
     /**
      * @dev Handles the bridged tokens for the first time, includes deployment of new TokenProxy contract.
@@ -62,7 +79,7 @@ abstract contract BasicOmnibridge is
 
     /**
      * @dev Handles the bridged tokens for the first time, includes deployment of new TokenProxy contract.
-     * Uses transferAndCall for bridging tokens.
+     * Executes a callback on the receiver.
      * Checks that the value is inside the execution limits and invokes the Mint accordingly.
      * @param _token address of the native ERC20/ERC677 token on the other side.
      * @param _name name of the native token, name suffix will be appended, if empty, symbol will be used instead.
@@ -110,7 +127,7 @@ abstract contract BasicOmnibridge is
     /**
      * @dev Handles the bridged tokens for the already registered token pair.
      * Checks that the value is inside the execution limits and invokes the Unlock accordingly.
-     * Uses transferAndCall for bridging tokens.
+     * Executes a callback on the receiver.
      * @param _token address of the native ERC20/ERC677 token on the other side.
      * @param _recipient address that will receive the tokens.
      * @param _value amount of tokens to be received.
@@ -121,7 +138,7 @@ abstract contract BasicOmnibridge is
         address _recipient,
         uint256 _value,
         bytes memory _data
-    ) external virtual onlyMediator {
+    ) external onlyMediator {
         address token = bridgedTokenAddress(_token);
 
         require(isTokenRegistered(token));
@@ -151,7 +168,7 @@ abstract contract BasicOmnibridge is
     /**
      * @dev Handles the bridged tokens that are native to this chain.
      * Checks that the value is inside the execution limits and invokes the Unlock accordingly.
-     * Uses transferAndCall for bridging tokens.
+     * Executes a callback on the receiver.
      * @param _token native ERC20 token.
      * @param _recipient address that will receive the tokens.
      * @param _value amount of tokens to be received.
@@ -176,7 +193,7 @@ abstract contract BasicOmnibridge is
      * @return message id of the send message.
      */
     function isRegisteredAsNativeToken(address _token) public view returns (bool) {
-        return nativeTokenAddress(_token) == address(0);
+        return isTokenRegistered(_token) && nativeTokenAddress(_token) == address(0);
     }
 
     /**
@@ -190,7 +207,7 @@ abstract contract BasicOmnibridge is
         address _recipient,
         uint256 _value
     ) internal override {
-        _releaseTokens(isRegisteredAsNativeToken(_token), _token, _recipient, _value, _value);
+        _releaseTokens(nativeTokenAddress(_token) == address(0), _token, _recipient, _value, _value);
     }
 
     /**
@@ -203,8 +220,13 @@ abstract contract BasicOmnibridge is
         require(!isTokenRegistered(_bridgedToken));
         require(nativeTokenAddress(_bridgedToken) == address(0));
         require(bridgedTokenAddress(_nativeToken) == address(0));
+        // Unfortunately, there is no simple way to verify that the _nativeToken address
+        // does not belong to the bridged token on the other side,
+        // since information about bridged tokens addresses is not transferred back.
+        // Therefore, owner account calling this function SHOULD manually verify on the other side of the bridge that
+        // nativeTokenAddress(_nativeToken) == address(0) && isTokenRegistered(_nativeToken) == false.
 
-        IBurnableMintableERC677Token(_bridgedToken).mint(address(this), 1);
+        IBurnableMintableERC677Token(_bridgedToken).safeMint(address(this), 1);
         IBurnableMintableERC677Token(_bridgedToken).burn(1);
 
         _setTokenAddressPair(_nativeToken, _bridgedToken);
@@ -214,6 +236,9 @@ abstract contract BasicOmnibridge is
      * @dev Allows to send to the other network the amount of locked tokens that can be forced into the contract
      * without the invocation of the required methods. (e. g. regular transfer without a call to onTokenTransfer)
      * @param _token address of the token contract.
+     * Before calling this method, it must be carefully investigated how imbalance happened
+     * in order to avoid an attempt to steal the funds from a token with double addresses
+     * (e.g. TUSD is accessible at both 0x8dd5fbCe2F6a956C3022bA3663759011Dd51e73E and 0x0000000000085d4780B73119b644AE5ecd22b376)
      * @param _receiver the address that will receive the tokens on the other network.
      */
     function fixMediatorBalance(address _token, address _receiver)
@@ -221,7 +246,7 @@ abstract contract BasicOmnibridge is
         onlyIfUpgradeabilityOwner
         validAddress(_receiver)
     {
-        require(isBridgedTokenDeployAcknowledged(_token));
+        require(isRegisteredAsNativeToken(_token));
 
         uint256 balance = IERC677(_token).balanceOf(address(this));
         uint256 expectedBalance = mediatorBalance(_token);
@@ -233,10 +258,8 @@ abstract contract BasicOmnibridge is
             diff = available;
         }
         addTotalSpentPerDay(_token, getCurrentDay(), diff);
-        _setMediatorBalance(_token, mediatorBalance(_token).add(diff));
 
-        bytes memory data = abi.encodeWithSelector(this.handleBridgedTokens.selector, _token, _receiver, diff);
-
+        bytes memory data = _prepareMessage(address(0), _token, _receiver, diff, new bytes(0));
         bytes32 _messageId = _passMessage(data, true);
         _recordBridgeOperation(_messageId, _token, _receiver, diff);
     }
@@ -295,7 +318,6 @@ abstract contract BasicOmnibridge is
      * @param _token bridged token address.
      * @param _receiver address of the tokens receiver on the other side.
      * @param _value bridged value.
-     * @param _decimals token decimals parameter.
      * @param _data additional transfer data passed from the other side.
      */
     function _prepareMessage(
@@ -303,7 +325,6 @@ abstract contract BasicOmnibridge is
         address _token,
         address _receiver,
         uint256 _value,
-        uint8 _decimals,
         bytes memory _data
     ) internal returns (bytes memory) {
         bool withData = _data.length > 0 || msg.sig == this.relayTokensAndCall.selector;
@@ -326,6 +347,7 @@ abstract contract BasicOmnibridge is
                         : abi.encodeWithSelector(this.handleBridgedTokens.selector, _token, _receiver, _value);
             }
 
+            uint8 decimals = TokenReader.readDecimals(_token);
             string memory name = TokenReader.readName(_token);
             string memory symbol = TokenReader.readSymbol(_token);
 
@@ -338,7 +360,7 @@ abstract contract BasicOmnibridge is
                         _token,
                         name,
                         symbol,
-                        _decimals,
+                        decimals,
                         _receiver,
                         _value,
                         _data
@@ -348,7 +370,7 @@ abstract contract BasicOmnibridge is
                         _token,
                         name,
                         symbol,
-                        _decimals,
+                        decimals,
                         _receiver,
                         _value
                     );
@@ -373,7 +395,7 @@ abstract contract BasicOmnibridge is
      * @param _token address of the token to mint.
      * @return address of the minter contract that should be used for calling mint(address,uint256)
      */
-    function _getMinterFor(address _token) internal view virtual returns (IBurnableMintableERC677Token) {
+    function _getMinterFor(address _token) internal pure virtual returns (IBurnableMintableERC677Token) {
         return IBurnableMintableERC677Token(_token);
     }
 
@@ -396,12 +418,12 @@ abstract contract BasicOmnibridge is
             IERC677(_token).safeTransfer(_recipient, _value);
             _setMediatorBalance(_token, mediatorBalance(_token).sub(_balanceChange));
         } else {
-            _getMinterFor(_token).mint(_recipient, _value);
+            _getMinterFor(_token).safeMint(_recipient, _value);
         }
     }
 
     /**
-     * Internal function getting address of the bridged token. Deploys new token is necessary.
+     * Internal function for getting address of the bridged token. Deploys new token if necessary.
      * @param _token address of the token contract on the other side of the bridge.
      * @param _name name of the native token, name suffix will be appended, if empty, symbol will be used instead.
      * @param _symbol symbol of the bridged token, if empty, name will be used instead.
@@ -452,12 +474,24 @@ abstract contract BasicOmnibridge is
         }
     }
 
+    /**
+     * @dev Internal function for transforming the bridged token name. Appends a side-specific suffix.
+     * @param _name bridged token from the other side.
+     * @return token name for this side of the bridge.
+     */
+    function _transformName(string memory _name) internal view returns (string memory) {
+        string memory result = string(abi.encodePacked(_name, SUFFIX));
+        uint256 size = SUFFIX_SIZE;
+        assembly {
+            mstore(result, add(mload(_name), size))
+        }
+        return result;
+    }
+
     function _handleTokens(
         address _token,
         bool _isNative,
         address _recipient,
         uint256 _value
     ) internal virtual;
-
-    function _transformName(string memory _name) internal pure virtual returns (string memory);
 }

@@ -35,7 +35,7 @@ contract UpgradeabilityProxy is Proxy, UpgradeabilityStorage {
         // This additional check verifies that provided implementation is at least a contract
         require(Address.isContract(implementation));
 
-        // This additional check guarantees that new version will be at least greater than the privios one,
+        // This additional check guarantees that new version will be at least greater than the previous one,
         // so it is impossible to reuse old versions, or use the last version twice
         require(version > _version);
 

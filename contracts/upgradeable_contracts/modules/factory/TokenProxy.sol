@@ -22,7 +22,6 @@ contract TokenProxy is Proxy {
     bool internal mintingFinished;
     address internal bridgeContractAddr;
     // string public constant version = "1";
-    // solhint-disable-next-line var-name-mixedcase
     bytes32 internal DOMAIN_SEPARATOR;
     // bytes32 public constant PERMIT_TYPEHASH = 0xea2aa0a1be11a07ed86d755c93467f4f82362b452371d1ba94d1715123511acb;
     mapping(address => uint256) internal nonces;

@@ -27,7 +27,7 @@ contract('WETHOmnibridgeRouter', (accounts) => {
 
     const tokenImage = await PermittableToken.new('TEST', 'TST', 18, 1337)
     const tokenFactory = await TokenFactory.new(owner, tokenImage.address)
-    mediator = await ForeignOmnibridge.new()
+    mediator = await ForeignOmnibridge.new(' on Testnet')
     ambBridgeContract = await AMBMock.new()
     await mediator.initialize(
       ambBridgeContract.address,

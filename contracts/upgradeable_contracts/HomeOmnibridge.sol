@@ -19,6 +19,8 @@ contract HomeOmnibridge is
     using SafeMath for uint256;
     using SafeERC20 for IERC677;
 
+    constructor(string memory _suffix) BasicOmnibridge(_suffix) {}
+
     /**
      * @dev Stores the initial parameters of the mediator.
      * @param _bridgeContract the address of the AMB bridge contract.
@@ -117,6 +119,10 @@ contract HomeOmnibridge is
         address _recipient,
         uint256 _value
     ) internal override {
+        // prohibit withdrawal of tokens during other bridge operations (e.g. relayTokens)
+        // such reentrant withdrawal can lead to an incorrect balanceDiff calculation
+        require(!lock());
+
         require(withinExecutionLimit(_token, _value));
         addTotalExecutedPerDay(_token, getCurrentDay(), _value);
 
@@ -150,21 +156,20 @@ contract HomeOmnibridge is
     ) internal override {
         require(_receiver != address(0) && _receiver != mediatorContractOnOtherSide());
 
-        uint8 decimals = uint8(TokenReader.readDecimals(_token));
-        address nativeToken = nativeTokenAddress(_token);
-
         // native unbridged token
         if (!isTokenRegistered(_token)) {
+            uint8 decimals = TokenReader.readDecimals(_token);
             _initializeTokenBridgeLimits(_token, decimals);
         }
 
         require(withinLimit(_token, _value));
         addTotalSpentPerDay(_token, getCurrentDay(), _value);
 
+        address nativeToken = nativeTokenAddress(_token);
         uint256 fee = _distributeFee(HOME_TO_FOREIGN_FEE, nativeToken == address(0), _from, _token, _value);
         uint256 valueToBridge = _value.sub(fee);
 
-        bytes memory data = _prepareMessage(nativeToken, _token, _receiver, valueToBridge, decimals, _data);
+        bytes memory data = _prepareMessage(nativeToken, _token, _receiver, valueToBridge, _data);
 
         // Address of the home token is used here for determining lane permissions.
         bytes32 _messageId = _passMessage(data, _isOracleDrivenLaneAllowed(_token, _from, _receiver));
@@ -192,15 +197,6 @@ contract HomeOmnibridge is
     }
 
     /**
-     * @dev Internal function for transforming the bridged token name. Appends a side-specific suffix.
-     * @param _name bridged token from the other side.
-     * @return token name for this side of the bridge.
-     */
-    function _transformName(string memory _name) internal pure override returns (string memory) {
-        return string(abi.encodePacked(_name, " on xDai"));
-    }
-
-    /**
      * @dev Internal function for getting minter proxy address.
      * Returns the token address itself, expect for the case with bridged STAKE token.
      * For bridged STAKE token, returns the hardcoded TokenMinter contract address.
@@ -213,6 +209,9 @@ contract HomeOmnibridge is
         override(BasicOmnibridge, OmnibridgeFeeManagerConnector)
         returns (IBurnableMintableERC677Token)
     {
+        // It is possible to hardcode different token minter contracts here during compile time.
+        // For example, the dedicated TokenMinter (0x857DD07866C1e19eb2CDFceF7aE655cE7f9E560d) is used for
+        // bridged STAKE token (0xb7D311E2Eb55F2f68a9440da38e7989210b9A05e).
         if (_token == address(0xb7D311E2Eb55F2f68a9440da38e7989210b9A05e)) {
             // hardcoded address of the TokenMinter address
             return IBurnableMintableERC677Token(0xb7D311E2Eb55F2f68a9440da38e7989210b9A05e);

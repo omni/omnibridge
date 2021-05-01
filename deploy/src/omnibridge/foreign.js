@@ -1,7 +1,12 @@
 const { web3Foreign, deploymentAddress } = require('../web3')
 const { deployContract, upgradeProxy } = require('../deploymentUtils')
 const { EternalStorageProxy, ForeignOmnibridge, PermittableToken, TokenFactory } = require('../loadContracts')
-const { FOREIGN_TOKEN_FACTORY, FOREIGN_ERC677_TOKEN_IMAGE, FOREIGN_BRIDGE_OWNER } = require('../loadEnv')
+const {
+  FOREIGN_TOKEN_FACTORY,
+  FOREIGN_ERC677_TOKEN_IMAGE,
+  FOREIGN_BRIDGE_OWNER,
+  FOREIGN_TOKEN_NAME_SUFFIX,
+} = require('../loadEnv')
 
 async function deployForeign() {
   let nonce = await web3Foreign.eth.getTransactionCount(deploymentAddress)
@@ -39,8 +44,9 @@ async function deployForeign() {
     console.log('\n[Foreign] Using existing token factory: ', tokenFactory)
   }
 
-  console.log('\n[Foreign] Deploying Bridge Mediator implementation\n')
-  const foreignBridgeImplementation = await deployContract(ForeignOmnibridge, [], {
+  console.log('\n[Foreign] Deploying Bridge Mediator implementation with the following parameters:')
+  console.log(`    TOKEN_NAME_SUFFIX: ${FOREIGN_TOKEN_NAME_SUFFIX}\n`)
+  const foreignBridgeImplementation = await deployContract(ForeignOmnibridge, [FOREIGN_TOKEN_NAME_SUFFIX], {
     network: 'foreign',
     nonce: nonce++,
   })
