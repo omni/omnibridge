@@ -4,8 +4,8 @@
   "description": "Omnibridge AMB extension",
   "main": "index.js",
   "scripts": {
-    "test": "scripts/test.sh",
-    "coverage": "SOLIDITY_COVERAGE=true scripts/test.sh",
+    "test": "test/test.sh",
+    "coverage": "SOLIDITY_COVERAGE=true yarn test",
     "compile": "truffle compile",
     "flatten": "bash flatten.sh 2>/dev/null",
     "lint": "yarn run lint:js && yarn run lint:sol",
