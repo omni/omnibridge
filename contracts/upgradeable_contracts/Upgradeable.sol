@@ -3,9 +3,18 @@ pragma solidity 0.7.5;
 import "../interfaces/IUpgradeabilityOwnerStorage.sol";
 
 contract Upgradeable {
-    // Avoid using onlyUpgradeabilityOwner name to prevent issues with implementation from proxy contract
+    /**
+     * @dev Throws if called by any account other than the upgradeability owner.
+     */
     modifier onlyIfUpgradeabilityOwner() {
-        require(msg.sender == IUpgradeabilityOwnerStorage(address(this)).upgradeabilityOwner());
+        _onlyIfUpgradeabilityOwner();
         _;
+    }
+
+    /**
+     * @dev Internal function for reducing onlyIfUpgradeabilityOwner modifier bytecode overhead.
+     */
+    function _onlyIfUpgradeabilityOwner() internal view {
+        require(msg.sender == IUpgradeabilityOwnerStorage(address(this)).upgradeabilityOwner());
     }
 }
