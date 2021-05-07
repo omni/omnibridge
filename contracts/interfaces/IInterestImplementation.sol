@@ -9,7 +9,7 @@ interface IInterestImplementation {
 
     function withdraw(uint256 _amount) external;
 
-    function underlyingBalance() external view returns (uint256);
+    function investedAmount() external view returns (uint256);
 
     function claimComp() external;
 }

@@ -7,4 +7,6 @@ interface IComptroller {
         bool borrowers,
         bool suppliers
     ) external;
+
+    function compAccrued(address holder) external view returns (uint256);
 }

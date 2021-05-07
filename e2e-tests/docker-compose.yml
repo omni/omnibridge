@@ -13,7 +13,7 @@ services:
   deploy-omni:
     build: ..
     env_file: local-envs/deploy-omni.env
-    entrypoint: bash -c 'mv build/contracts/ForeignOmnibridgeMock.json build/contracts/ForeignOmnibridge.json && deploy.sh'
+    entrypoint: deploy.sh
   deploy-compound:
     image: kirillfedoseev/compound-test-deploy
     environment:
