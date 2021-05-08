@@ -5,12 +5,15 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../../Ownable.sol";
 import "../../../interfaces/IInterestReceiver.sol";
 import "../../../interfaces/IInterestImplementation.sol";
+import "../native/MediatorBalanceStorage.sol";
 
 /**
  * @title InterestConnector
  * @dev This contract gives an abstract way of receiving interest on locked tokens.
  */
-contract InterestConnector is Ownable {
+contract InterestConnector is Ownable, MediatorBalanceStorage {
+    using SafeMath for uint256;
+
     /**
      * @dev Tells address of the interest earning implementation for the specific token contract.
      * If interest earning is disabled, will return 0x00..00.
@@ -74,13 +77,14 @@ contract InterestConnector is Ownable {
      * @param _token address of the token contract considered.
      */
     function invest(address _token) external {
-        uint256 balance = IERC20(_token).balanceOf(address(this));
+        IInterestImplementation impl = interestImplementation(_token);
+        // less than _token.balanceOf(this), since it does not take into account mistakenly locked tokens that should be processed via fixMediatorBalance.
+        uint256 balance = mediatorBalance(_token).sub(impl.investedAmount());
         uint256 minCash = minCashThreshold(_token);
 
         require(balance > minCash);
         uint256 amount = balance - minCash;
 
-        IInterestImplementation impl = interestImplementation(_token);
         IERC20(_token).transfer(address(impl), amount);
         impl.invest(amount);
     }
