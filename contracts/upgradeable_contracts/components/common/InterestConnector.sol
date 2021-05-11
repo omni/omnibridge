@@ -37,6 +37,7 @@ contract InterestConnector is Ownable, MediatorBalanceStorage {
         address _impl,
         uint256 _minCashThreshold
     ) external onlyOwner {
+        require(address(interestImplementation(_token)) == address(0));
         _setInterestImplementation(_token, _impl);
         _setMinCashThreshold(_token, _minCashThreshold);
     }
