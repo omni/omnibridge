@@ -137,6 +137,19 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager, InterestConnecto
         uint256 _balanceChange
     ) internal override {
         if (_isNative) {
+            // There are two edge cases related to withdrawals on the foreign side of the bridge.
+            // 1) Minting of extra STAKE tokens, if supply on the Home side exceeds total bridge amount on the Foreign side.
+            // 2) Withdrawal of the invested tokens back from the Compound-like protocol, if currently available funds are insufficient.
+            // Most of the time, these cases do not intersect. However, in case STAKE tokens are also invested (e.g. via EasyStaking),
+            // the situation can be the following:
+            // - 20 STAKE are bridged through the OB. 15 STAKE of which are invested into EasyStaking, and 5 STAKE are locked directly on the bridge.
+            // - 5 STAKE are mistakenly locked on the bridge via regular transfer, they are not accounted in mediatorBalance(STAKE)
+            // - User requests withdrawal of 30 STAKE from the Home side.
+            // Correct sequence of actions should be the following:
+            // - Mint new STAKE tokens (value - mediatorBalance(STAKE) = 30 STAKE - 20 STAKE = 10 STAKE)
+            // - Set local variable balance to 30 STAKE
+            // - Withdraw all invested STAKE tokens (value - (balance - investedAmount()) = 30 STAKE - (30 STAKE - 15 STAKE) = 15 STAKE)
+
             uint256 balance = mediatorBalance(_token);
             if (_token == address(0x0Ae055097C6d159879521C384F1D2123D1f195e6) && balance < _value) {
                 IBurnableMintableERC677Token(_token).safeMint(address(this), _value - balance);
