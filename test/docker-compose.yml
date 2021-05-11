@@ -8,5 +8,9 @@ services:
   compound:
     image: kirillfedoseev/compound-test-deploy
     # build: compound
+    environment:
+      - PROVIDER
     stdin_open: true
     tty: true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
