@@ -28,8 +28,6 @@ if [ "$SOLIDITY_COVERAGE" = true ]; then
   PROVIDER=http://host.docker.internal:8545 docker-compose -f test/docker-compose.yml up compound || true
 
   wait $pid
-
-  istanbul report lcov
 else
   if ganache_running; then
     echo "Using existing ganache instance"
