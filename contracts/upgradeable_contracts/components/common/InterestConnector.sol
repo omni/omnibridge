@@ -68,7 +68,7 @@ contract InterestConnector is Ownable, MediatorBalanceStorage {
      * @param _token of token to disable interest for.
      */
     function disableInterest(address _token) external onlyOwner {
-        _withdraw(_token, uint256(-1));
+        interestImplementation(_token).withdraw(_token, uint256(-1));
         _setInterestImplementation(_token, address(0));
     }
 
@@ -99,16 +99,6 @@ contract InterestConnector is Ownable, MediatorBalanceStorage {
     function _setInterestImplementation(address _token, address _impl) internal {
         require(_impl == address(0) || IInterestImplementation(_impl).isInterestSupported(_token));
         addressStorage[keccak256(abi.encodePacked("interestImpl", _token))] = _impl;
-    }
-
-    /**
-     * @dev Internal function for withdrawing some amount of the invested tokens.
-     * Reverts if given amount cannot be withdrawn.
-     * @param _token address of the token contract withdrawn.
-     * @param _amount amount of requested tokens to be withdrawn.
-     */
-    function _withdraw(address _token, uint256 _amount) internal {
-        interestImplementation(_token).withdraw(_token, _amount);
     }
 
     /**

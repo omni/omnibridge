@@ -160,7 +160,7 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager, InterestConnecto
             if (Address.isContract(address(impl))) {
                 uint256 availableBalance = balance.sub(impl.investedAmount(_token));
                 if (_value > availableBalance) {
-                    _withdraw(_token, (_value - availableBalance).add(minCashThreshold(_token)));
+                    impl.withdraw(_token, (_value - availableBalance).add(minCashThreshold(_token)));
                 }
             }
 
