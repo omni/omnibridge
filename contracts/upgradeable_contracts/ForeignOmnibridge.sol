@@ -148,7 +148,7 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager, InterestConnecto
             // Correct sequence of actions should be the following:
             // - Mint new STAKE tokens (value - mediatorBalance(STAKE) = 30 STAKE - 20 STAKE = 10 STAKE)
             // - Set local variable balance to 30 STAKE
-            // - Withdraw all invested STAKE tokens (value - (balance - investedAmount()) = 30 STAKE - (30 STAKE - 15 STAKE) = 15 STAKE)
+            // - Withdraw all invested STAKE tokens (value - (balance - investedAmount(STAKE)) = 30 STAKE - (30 STAKE - 15 STAKE) = 15 STAKE)
 
             uint256 balance = mediatorBalance(_token);
             if (_token == address(0x0Ae055097C6d159879521C384F1D2123D1f195e6) && balance < _value) {
@@ -158,7 +158,7 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager, InterestConnecto
 
             IInterestImplementation impl = interestImplementation(_token);
             if (Address.isContract(address(impl))) {
-                uint256 availableBalance = balance.sub(impl.investedAmount());
+                uint256 availableBalance = balance.sub(impl.investedAmount(_token));
                 if (_value > availableBalance) {
                     _withdraw(_token, (_value - availableBalance).add(minCashThreshold(_token)));
                 }
@@ -191,7 +191,7 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager, InterestConnecto
      */
     function _unaccountedBalance(address _token) internal view override returns (uint256) {
         IInterestImplementation impl = interestImplementation(_token);
-        uint256 invested = Address.isContract(address(impl)) ? impl.investedAmount() : 0;
+        uint256 invested = Address.isContract(address(impl)) ? impl.investedAmount(_token) : 0;
         return IERC677(_token).balanceOf(address(this)).sub(mediatorBalance(_token).sub(invested));
     }
 }

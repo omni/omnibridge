@@ -80,14 +80,14 @@ contract InterestConnector is Ownable, MediatorBalanceStorage {
     function invest(address _token) external {
         IInterestImplementation impl = interestImplementation(_token);
         // less than _token.balanceOf(this), since it does not take into account mistakenly locked tokens that should be processed via fixMediatorBalance.
-        uint256 balance = mediatorBalance(_token).sub(impl.investedAmount());
+        uint256 balance = mediatorBalance(_token).sub(impl.investedAmount(_token));
         uint256 minCash = minCashThreshold(_token);
 
         require(balance > minCash);
         uint256 amount = balance - minCash;
 
         IERC20(_token).transfer(address(impl), amount);
-        impl.invest(amount);
+        impl.invest(_token, amount);
     }
 
     /**
@@ -108,7 +108,7 @@ contract InterestConnector is Ownable, MediatorBalanceStorage {
      * @param _amount amount of requested tokens to be withdrawn.
      */
     function _withdraw(address _token, uint256 _amount) internal {
-        interestImplementation(_token).withdraw(_amount);
+        interestImplementation(_token).withdraw(_token, _amount);
     }
 
     /**

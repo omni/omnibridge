@@ -6,12 +6,9 @@ contract CompoundInterestERC20Mock is CompoundInterestERC20 {
     constructor(
         address _omnibridge,
         address _owner,
-        ICToken _cToken,
-        uint256 _dust,
-        address _interestReceiver,
-        uint256 _minInterestPaid,
-        uint256 _minCompPaid
-    ) CompoundInterestERC20(_omnibridge, _owner, _cToken, _dust, _interestReceiver, _minInterestPaid, _minCompPaid) {}
+        uint256 _minCompPaid,
+        address _compReceiver
+    ) CompoundInterestERC20(_omnibridge, _owner, _minCompPaid, _compReceiver) {}
 
     function comptroller() public pure override returns (IComptroller) {
         return IComptroller(0x85e855b22F01BdD33eE194490c7eB16b7EdaC019);
