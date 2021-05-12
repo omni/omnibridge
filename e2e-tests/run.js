@@ -105,8 +105,9 @@ async function deployWETHRouter(web3, options, bridge, WETH, owner) {
 }
 
 async function deployInterestImpl(web3, mediator, owner, cToken, options) {
-  const args = [toAddress(mediator), owner, toAddress(cToken), toWei('1'), owner, toWei('1'), '1']
+  const args = [toAddress(mediator), owner, '1', owner]
   const contract = await deploy(web3, options, InterestImpl.abi, InterestImpl.bytecode, args)
+  await contract.methods.enableInterestToken(toAddress(cToken), toWei('1'), owner, toWei('1')).send({ from: owner })
   console.log(`Deployed Interest implementation contract ${contract.options.address}`)
   return contract
 }
@@ -328,8 +329,8 @@ async function createEnv(web3Home, web3Foreign) {
       console.log('Paying earned interest in 2 tokens')
       const balance = await compound.token.methods.balanceOf(owner).call()
       const balanceComp = await comp.methods.balanceOf(owner).call()
-      await interestImpl.methods.payInterest().send()
-      await interestImpl.methods.claimCompAndPay().send()
+      await interestImpl.methods.payInterest(toAddress(compound.token)).send()
+      await interestImpl.methods.claimCompAndPay([toAddress(cToken)]).send()
       const diff = toBN(await compound.token.methods.balanceOf(owner).call()).sub(toBN(balance))
       const diffComp = toBN(await comp.methods.balanceOf(owner).call()).sub(toBN(balanceComp))
       assert.ok(diff.gtn(0), 'No interest in regular tokens was earned')
