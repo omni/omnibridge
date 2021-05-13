@@ -2,6 +2,7 @@ pragma solidity 0.7.5;
 
 import "./BasicOmnibridge.sol";
 import "./components/common/GasLimitManager.sol";
+import "./components/common/InterestConnector.sol";
 import "../libraries/SafeMint.sol";
 
 /**
@@ -9,7 +10,7 @@ import "../libraries/SafeMint.sol";
  * @dev Foreign side implementation for multi-token mediator intended to work on top of AMB bridge.
  * It is designed to be used as an implementation contract of EternalStorageProxy contract.
  */
-contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager {
+contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager, InterestConnector {
     using SafeERC20 for IERC677;
     using SafeMint for IBurnableMintableERC677Token;
     using SafeMath for uint256;
@@ -136,11 +137,33 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager {
         uint256 _balanceChange
     ) internal override {
         if (_isNative) {
+            // There are two edge cases related to withdrawals on the foreign side of the bridge.
+            // 1) Minting of extra STAKE tokens, if supply on the Home side exceeds total bridge amount on the Foreign side.
+            // 2) Withdrawal of the invested tokens back from the Compound-like protocol, if currently available funds are insufficient.
+            // Most of the time, these cases do not intersect. However, in case STAKE tokens are also invested (e.g. via EasyStaking),
+            // the situation can be the following:
+            // - 20 STAKE are bridged through the OB. 15 STAKE of which are invested into EasyStaking, and 5 STAKE are locked directly on the bridge.
+            // - 5 STAKE are mistakenly locked on the bridge via regular transfer, they are not accounted in mediatorBalance(STAKE)
+            // - User requests withdrawal of 30 STAKE from the Home side.
+            // Correct sequence of actions should be the following:
+            // - Mint new STAKE tokens (value - mediatorBalance(STAKE) = 30 STAKE - 20 STAKE = 10 STAKE)
+            // - Set local variable balance to 30 STAKE
+            // - Withdraw all invested STAKE tokens (value - (balance - investedAmount(STAKE)) = 30 STAKE - (30 STAKE - 15 STAKE) = 15 STAKE)
+
             uint256 balance = mediatorBalance(_token);
             if (_token == address(0x0Ae055097C6d159879521C384F1D2123D1f195e6) && balance < _value) {
                 IBurnableMintableERC677Token(_token).safeMint(address(this), _value - balance);
                 balance = _value;
             }
+
+            IInterestImplementation impl = interestImplementation(_token);
+            if (Address.isContract(address(impl))) {
+                uint256 availableBalance = balance.sub(impl.investedAmount(_token));
+                if (_value > availableBalance) {
+                    impl.withdraw(_token, (_value - availableBalance).add(minCashThreshold(_token)));
+                }
+            }
+
             _setMediatorBalance(_token, balance.sub(_balanceChange));
             IERC677(_token).safeTransfer(_recipient, _value);
         } else {
@@ -158,5 +181,17 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager {
         (_useOracleLane);
 
         return bridgeContract().requireToPassMessage(mediatorContractOnOtherSide(), _data, requestGasLimit());
+    }
+
+    /**
+     * @dev Internal function for counting excess balance which is not tracked within the bridge.
+     * Represents the amount of forced tokens on this contract.
+     * @param _token address of the token contract.
+     * @return amount of excess tokens.
+     */
+    function _unaccountedBalance(address _token) internal view override returns (uint256) {
+        IInterestImplementation impl = interestImplementation(_token);
+        uint256 invested = Address.isContract(address(impl)) ? impl.investedAmount(_token) : 0;
+        return IERC677(_token).balanceOf(address(this)).sub(mediatorBalance(_token).sub(invested));
     }
 }
