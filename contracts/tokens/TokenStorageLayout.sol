@@ -5,6 +5,8 @@ pragma solidity 0.7.5;
  * @dev Storage layout for tokens contract used together with Omnibridge
  */
 contract TokenStorageLayout {
+    // NOTE: It is safe to add new storage variables only to the end of this file.
+
     string internal _name;
     string internal _symbol;
     uint8 internal _decimals;
@@ -13,12 +15,11 @@ contract TokenStorageLayout {
     mapping(address => mapping(address => uint256)) internal _allowances;
     address internal _owner;
 
-    bool internal _mintingFinished; // unused
+    // unused, required to keep the same layout as it was in the previous version of the token contract.
+    bool internal _mintingFinished;
 
-    address internal bridgeContractAddr;
-    // string public constant version = "1";
+    address internal _bridgeContract;
     bytes32 internal _DOMAIN_SEPARATOR;
-    // bytes32 public constant PERMIT_TYPEHASH = 0xea2aa0a1be11a07ed86d755c93467f4f82362b452371d1ba94d1715123511acb;
     mapping(address => uint256) internal _nonces;
     mapping(address => mapping(address => uint256)) internal _expirations;
 }

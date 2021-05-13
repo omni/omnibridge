@@ -40,7 +40,7 @@ contract TokenProxy is Proxy, TokenStorageLayout {
         _symbol = symbol;
         _decimals = decimals;
         _owner = owner; // owner == HomeOmnibridge/ForeignOmnibridge mediator
-        bridgeContractAddr = owner;
+        _bridgeContract = owner;
         _DOMAIN_SEPARATOR = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),

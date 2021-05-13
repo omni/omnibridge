@@ -17,7 +17,7 @@ contract ERC677Mock is OmnibridgeTokenImage {
         _symbol = symbol;
         _decimals = decimals;
         _owner = msg.sender;
-        bridgeContractAddr = msg.sender;
+        _bridgeContract = msg.sender;
         _DOMAIN_SEPARATOR = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
