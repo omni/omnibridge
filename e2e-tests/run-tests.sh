@@ -25,6 +25,7 @@ if [[ "$1" == 'local' ]]; then
 
   docker-compose run --rm deploy-amb
   docker-compose run --rm deploy-omni
+  docker-compose up deploy-compound || true
 
   docker-compose up -d rabbit redis bridge_affirmation bridge_request bridge_collected bridge_senderhome bridge_senderforeign
 

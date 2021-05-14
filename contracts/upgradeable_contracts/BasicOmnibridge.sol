@@ -248,10 +248,8 @@ abstract contract BasicOmnibridge is
     {
         require(isRegisteredAsNativeToken(_token));
 
-        uint256 balance = IERC677(_token).balanceOf(address(this));
-        uint256 expectedBalance = mediatorBalance(_token);
-        require(balance > expectedBalance);
-        uint256 diff = balance - expectedBalance;
+        uint256 diff = _unaccountedBalance(_token);
+        require(diff > 0);
         uint256 available = maxAvailablePerTx(_token);
         require(available > 0);
         if (diff > available) {
@@ -486,6 +484,16 @@ abstract contract BasicOmnibridge is
             mstore(result, add(mload(_name), size))
         }
         return result;
+    }
+
+    /**
+     * @dev Internal function for counting excess balance which is not tracked within the bridge.
+     * Represents the amount of forced tokens on this contract.
+     * @param _token address of the token contract.
+     * @return amount of excess tokens.
+     */
+    function _unaccountedBalance(address _token) internal view virtual returns (uint256) {
+        return IERC677(_token).balanceOf(address(this)).sub(mediatorBalance(_token));
     }
 
     function _handleTokens(

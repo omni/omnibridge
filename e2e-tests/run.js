@@ -16,6 +16,9 @@ const ForeignABI = [...require('../build/contracts/ForeignOmnibridge.json').abi,
 const FeeManagerABI = [...require('../build/contracts/OmnibridgeFeeManager.json').abi]
 const WETH = require('../build/contracts/WETH.json')
 const WETHOmnibridgeRouter = require('../build/contracts/WETHOmnibridgeRouter.json')
+const InterestImpl = require('../build/contracts/CompoundInterestERC20Mock.json')
+const ComptrollerABI = require('../build/contracts/IHarnessComptroller.json').abi
+const CTokenABI = require('../build/contracts/ICToken.json').abi
 
 const WETHOmnibridgeRouterABI = [...WETHOmnibridgeRouter.abi, ...AMBEventABI]
 
@@ -36,6 +39,7 @@ const scenarios = [
   require('./scenarios/bridgeForeignTokensAndCall'),
   require('./scenarios/bridgeHomeTokensAndCall'),
   require('./scenarios/bridgeNativeETH'),
+  require('./scenarios/investForeignTokensIntoCompound'),
 ]
 const { toWei, toBN, ZERO_ADDRESS, toAddress, addPendingTxLogger } = require('./utils')
 
@@ -55,6 +59,11 @@ const {
   TEST_ACCOUNT_PRIVATE_KEY,
   SECOND_TEST_ACCOUNT_PRIVATE_KEY,
   OWNER_ACCOUNT_PRIVATE_KEY,
+  COMPOUND_FAUCET_PRIVATE_KEY,
+  COMPOUND_TOKEN_ADDRESS,
+  COMPOUND_CTOKEN_ADDRESS,
+  COMPOUND_COMP_ADDRESS,
+  COMPOUND_COMPTROLLER_ADDRESS,
 } = process.env
 
 function deploy(web3, options, abi, bytecode, args) {
@@ -92,6 +101,14 @@ async function deployWETHRouter(web3, options, bridge, WETH, owner) {
   const args = [toAddress(bridge), toAddress(WETH), owner]
   const contract = await deploy(web3, options, WETHOmnibridgeRouterABI, WETHOmnibridgeRouter.bytecode, args)
   console.log(`Deployed WETHOmnibridgeRouter token ${contract.options.address}`)
+  return contract
+}
+
+async function deployInterestImpl(web3, mediator, owner, cToken, options) {
+  const args = [toAddress(mediator), owner, '1', owner]
+  const contract = await deploy(web3, options, InterestImpl.abi, InterestImpl.bytecode, args)
+  await contract.methods.enableInterestToken(toAddress(cToken), toWei('1'), owner, toWei('1')).send({ from: owner })
+  console.log(`Deployed Interest implementation contract ${contract.options.address}`)
   return contract
 }
 
@@ -267,6 +284,60 @@ async function createEnv(web3Home, web3Foreign) {
   const WETH = await deployWETH(web3Foreign, foreignOptions)
   const WETHRouter = await deployWETHRouter(web3Foreign, foreignOptions, foreignMediator, WETH, owner)
 
+  console.log('Initializing Compound environment')
+  const compound = {}
+  if (
+    COMPOUND_FAUCET_PRIVATE_KEY &&
+    COMPOUND_COMP_ADDRESS &&
+    COMPOUND_TOKEN_ADDRESS &&
+    COMPOUND_CTOKEN_ADDRESS &&
+    COMPOUND_COMPTROLLER_ADDRESS
+  ) {
+    compound.faucet = web3Foreign.eth.accounts.wallet.add(COMPOUND_FAUCET_PRIVATE_KEY).address
+    const faucetOptions = { ...foreignOptions, from: compound.faucet }
+    const comp = new web3Foreign.eth.Contract(TokenABI, COMPOUND_COMP_ADDRESS, faucetOptions)
+    const cToken = new web3Foreign.eth.Contract(CTokenABI, COMPOUND_CTOKEN_ADDRESS, faucetOptions)
+    const comptroller = new web3Foreign.eth.Contract(ComptrollerABI, COMPOUND_COMPTROLLER_ADDRESS, foreignOptions)
+    console.log('Deploy Interest implementation')
+    const interestImpl = await deployInterestImpl(web3Foreign, foreignMediator, owner, cToken, foreignOptions)
+
+    compound.token = new web3Foreign.eth.Contract(TokenABI, COMPOUND_TOKEN_ADDRESS, faucetOptions)
+
+    compound.enableInterest = async () => {
+      console.log('Enabling interest for the given token')
+      await foreignMediator.methods
+        .initializeInterest(toAddress(compound.token), toAddress(interestImpl), toWei('1'))
+        .send({ from: owner })
+
+      console.log('Investing excess tokens')
+      await foreignMediator.methods.invest(toAddress(compound.token)).send()
+    }
+
+    compound.disableInterest = async () => {
+      console.log('Disabling interest for the given token')
+      await foreignMediator.methods.disableInterest(toAddress(compound.token)).send({ from: owner })
+    }
+
+    compound.waitForInterest = async () => {
+      console.log('Generating some amount of interest to Compound suppliers')
+      await cToken.methods.borrow(toWei('10')).send()
+      await comptroller.methods.fastForward(200000).send()
+      await cToken.methods.repayBorrow(toWei('20')).send()
+    }
+
+    compound.acquireInterest = async () => {
+      console.log('Paying earned interest in 2 tokens')
+      const balance = await compound.token.methods.balanceOf(owner).call()
+      const balanceComp = await comp.methods.balanceOf(owner).call()
+      await interestImpl.methods.payInterest(toAddress(compound.token)).send()
+      await interestImpl.methods.claimCompAndPay([toAddress(cToken)]).send()
+      const diff = toBN(await compound.token.methods.balanceOf(owner).call()).sub(toBN(balance))
+      const diffComp = toBN(await comp.methods.balanceOf(owner).call()).sub(toBN(balanceComp))
+      assert.ok(diff.gtn(0), 'No interest in regular tokens was earned')
+      assert.ok(diffComp.gtn(0), 'No interest in COMP tokens was earned')
+    }
+  }
+
   return {
     home: {
       web3: web3Home,
@@ -293,6 +364,7 @@ async function createEnv(web3Home, web3Foreign) {
       waitUntilProcessed: makeWaitUntilProcessed(foreignAMB, 'RelayedMessage', foreignBlockNumber),
       withDisabledExecution: makeWithDisabledExecution(foreignMediator, owner),
       checkTransfer: makeCheckTransfer(web3Foreign),
+      compound,
       WETH,
       WETHRouter,
     },

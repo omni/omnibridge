@@ -5,7 +5,7 @@ services:
     command: --deterministic --chainId 1337 --blockTime 1 --gasLimit 10000000
   foreign:
     image: trufflesuite/ganache-cli
-    command: --deterministic --chainId 1338 --blockTime 1 --gasLimit 10000000
+    command: --deterministic --chainId 1338 --blockTime 1 --gasLimit 20000000 --allowUnlimitedContractSize
   deploy-amb:
     image: poanetwork/tokenbridge-contracts
     env_file: local-envs/deploy-amb.env
@@ -14,6 +14,12 @@ services:
     build: ..
     env_file: local-envs/deploy-omni.env
     entrypoint: deploy.sh
+  deploy-compound:
+    image: kirillfedoseev/compound-test-deploy
+    environment:
+      PROVIDER: 'http://foreign:8545'
+    stdin_open: true
+    tty: true
   e2e-tests:
     build:
       context: ..
