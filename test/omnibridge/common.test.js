@@ -135,7 +135,6 @@ function runTests(accounts, isHome) {
     PermittableToken = await requirePrecompiled('PermittableToken')
 
     tokenImage = await PermittableToken.new('TEST', 'TST', 18, 1337)
-    tokenFactory = await TokenFactory.new(owner, tokenImage.address)
   })
 
   beforeEach(async () => {
@@ -144,6 +143,7 @@ function runTests(accounts, isHome) {
     token = await ERC677BridgeToken.new('TEST', 'TST', 18)
     currentDay = await contract.getCurrentDay()
     tokenReceiver = await TokenReceiver.new()
+    tokenFactory = await TokenFactory.new(contract.address, tokenImage.address)
   })
 
   describe('getBridgeMode', () => {
@@ -295,6 +295,8 @@ function runTests(accounts, isHome) {
       }
       expect(await contract.owner()).to.be.equal(owner)
       expect(await contract.tokenFactory()).to.be.equal(tokenFactory.address)
+      expect(await tokenFactory.owner()).to.be.equal(owner)
+      expect(await tokenFactory.mediator()).to.be.equal(contract.address)
 
       expectEventInLogs(logs, 'ExecutionDailyLimitChanged', { token: ZERO_ADDRESS, newLimit: executionDailyLimit })
       expectEventInLogs(logs, 'DailyLimitChanged', { token: ZERO_ADDRESS, newLimit: dailyLimit })
@@ -411,7 +413,7 @@ function runTests(accounts, isHome) {
         })
 
         it('should allow to change token factory', async () => {
-          const newTokenFactory = await TokenFactory.new(owner, tokenImage.address)
+          const newTokenFactory = await TokenFactory.new(contract.address, tokenImage.address)
           await contract.setTokenFactory(owner, { from: owner }).should.be.rejected
           await contract.setTokenFactory(newTokenFactory.address, { from: user }).should.be.rejected
           await contract.setTokenFactory(newTokenFactory.address, { from: owner }).should.be.fulfilled
@@ -424,7 +426,11 @@ function runTests(accounts, isHome) {
         describe('gas limit manager', () => {
           let manager
           beforeEach(async () => {
-            manager = await SelectorTokenGasLimitManager.new(ambBridgeContract.address, owner, 1000000)
+            manager = await SelectorTokenGasLimitManager.new(ambBridgeContract.address, contract.address, 1000000)
+            expect(await manager.owner()).to.be.equal(owner)
+            expect(await manager.mediator()).to.be.equal(contract.address)
+            expect(await manager.bridge()).to.be.equal(ambBridgeContract.address)
+            expect(await manager.methods['requestGasLimit()']()).to.be.bignumber.equal('1000000')
           })
 
           it('should allow to set new manager', async () => {
@@ -434,9 +440,6 @@ function runTests(accounts, isHome) {
             await contract.setGasLimitManager(manager.address, { from: owner }).should.be.fulfilled
 
             expect(await contract.gasLimitManager()).to.be.equal(manager.address)
-            expect(await manager.owner()).to.be.equal(owner)
-            expect(await manager.bridge()).to.be.equal(ambBridgeContract.address)
-            expect(await manager.methods['requestGasLimit()']()).to.be.bignumber.equal('1000000')
           })
 
           it('should allow to set request gas limit for specific selector', async () => {
@@ -1677,7 +1680,9 @@ function runTests(accounts, isHome) {
       let feeManager
       beforeEach(async () => {
         await initialize().should.be.fulfilled
-        feeManager = await OmnibridgeFeeManager.new(contract.address, owner, [owner], [ether('0.02'), ether('0.01')])
+        feeManager = await OmnibridgeFeeManager.new(contract.address, [owner], [ether('0.02'), ether('0.01')])
+        expect(await feeManager.owner()).to.be.equal(owner)
+        expect(await feeManager.mediator()).to.be.equal(contract.address)
         await contract.setFeeManager(feeManager.address, { from: owner }).should.be.fulfilled
 
         const initialEvents = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
@@ -2159,12 +2164,13 @@ function runTests(accounts, isHome) {
     describe('oracle driven lane permissions', () => {
       let manager
       beforeEach(async () => {
-        manager = await MultiTokenForwardingRulesManager.new(owner)
+        await initialize().should.be.fulfilled
+        manager = await MultiTokenForwardingRulesManager.new(contract.address)
         expect(await manager.owner()).to.be.equal(owner)
+        expect(await manager.mediator()).to.be.equal(contract.address)
       })
 
       it('should allow to update manager address', async () => {
-        await initialize().should.be.fulfilled
         await contract.setForwardingRulesManager(manager.address, { from: user }).should.be.rejected
         await contract.setForwardingRulesManager(manager.address, { from: owner }).should.be.fulfilled
 
@@ -2223,7 +2229,6 @@ function runTests(accounts, isHome) {
       })
 
       it('should send a message to the manual lane', async () => {
-        await initialize().should.be.fulfilled
         await token.mint(user, ether('10'), { from: owner }).should.be.fulfilled
         const args = [otherSideToken1, 'Test', 'TST', 18, user, value]
         const data = contract.contract.methods.deployAndHandleBridgedTokens(...args).encodeABI()
@@ -2278,7 +2283,7 @@ function runTests(accounts, isHome) {
           limits: [ether('100'), ether('99'), ether('0.01')],
           executionLimits: [ether('100'), ether('99')],
         })
-        daiInterestImpl = await CompoundInterestERC20.new(contract.address, owner, 1, accounts[2])
+        daiInterestImpl = await CompoundInterestERC20.new(contract.address, 1, accounts[2])
         await daiInterestImpl.enableInterestToken(cDai.address, oneEther, accounts[2], ether('0.01'))
         await dai.approve(contract.address, ether('100'), { from: faucet })
         await contract.methods['relayTokens(address,uint256)'](dai.address, ether('10'), { from: faucet })

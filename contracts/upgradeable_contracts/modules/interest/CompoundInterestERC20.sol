@@ -7,13 +7,13 @@ import "../../../interfaces/IComptroller.sol";
 import "../../../interfaces/IOwnable.sol";
 import "../../../interfaces/IInterestReceiver.sol";
 import "../../../interfaces/IInterestImplementation.sol";
-import "../MediatorOwnableModule.sol";
+import "../OmnibridgeModule.sol";
 
 /**
  * @title CompoundInterestERC20
  * @dev This contract contains token-specific logic for investing ERC20 tokens into Compound protocol.
  */
-contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule {
+contract CompoundInterestERC20 is IInterestImplementation, OmnibridgeModule {
     using SafeMath for uint256;
 
     event PaidInterest(address indexed token, address to, uint256 value);
@@ -33,11 +33,10 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
     address public compReceiver;
 
     constructor(
-        address _omnibridge,
-        address _owner,
+        IOwnable _omnibridge,
         uint256 _minCompPaid,
         address _compReceiver
-    ) MediatorOwnableModule(_omnibridge, _owner) {
+    ) OmnibridgeModule(_omnibridge) {
         minCompPaid = _minCompPaid;
         compReceiver = _compReceiver;
     }
@@ -121,7 +120,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
         uint256 invested = params.investedAmount;
         uint256 redeemed = _safeWithdraw(_token, _amount > invested ? invested : _amount);
         params.investedAmount = redeemed > invested ? 0 : invested - redeemed;
-        IERC20(_token).transfer(mediator, redeemed);
+        IERC20(_token).transfer(address(mediator), redeemed);
     }
 
     /**
@@ -188,9 +187,9 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
         // try to redeem all cTokens
         if (cToken.redeem(cTokenBalance) != SUCCESS) {
             // transfer cTokens as-is, if redeem has failed
-            cToken.transfer(mediator, cTokenBalance);
+            cToken.transfer(address(mediator), cTokenBalance);
         }
-        IERC20(_token).transfer(mediator, IERC20(_token).balanceOf(address(this)));
+        IERC20(_token).transfer(address(mediator), IERC20(_token).balanceOf(address(this)));
 
         delete params.cToken;
         delete params.dust;

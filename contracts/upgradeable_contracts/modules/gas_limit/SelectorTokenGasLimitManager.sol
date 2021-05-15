@@ -8,7 +8,7 @@ import "../../BasicOmnibridge.sol";
  * @title SelectorTokenGasLimitManager
  * @dev Multi token mediator functionality for managing request gas limits.
  */
-contract SelectorTokenGasLimitManager is OwnableModule {
+contract SelectorTokenGasLimitManager is OmnibridgeModule {
     IAMB public immutable bridge;
 
     uint256 internal defaultGasLimit;
@@ -17,9 +17,9 @@ contract SelectorTokenGasLimitManager is OwnableModule {
 
     constructor(
         IAMB _bridge,
-        address _owner,
+        IOwnable _mediator,
         uint256 _gasLimit
-    ) OwnableModule(_owner) {
+    ) OmnibridgeModule(_mediator) {
         require(_gasLimit <= _bridge.maxGasPerTx());
         bridge = _bridge;
         defaultGasLimit = _gasLimit;
