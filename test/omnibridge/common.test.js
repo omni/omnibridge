@@ -2187,15 +2187,15 @@ function runTests(accounts, isHome) {
         await manager.setTokenForwardingRule(token.address, true, { from: user }).should.be.rejected
         await manager.setTokenForwardingRule(token.address, true, { from: owner }).should.be.fulfilled
 
-        expect(await manager.destinationLane(token.address, user, user2)).to.be.bignumber.equal('-1')
+        expect(await manager.destinationLane(token.address, user, user2)).to.be.bignumber.equal('1')
 
         await manager.setSenderExceptionForTokenForwardingRule(token.address, user, true, { from: user }).should.be
           .rejected
         await manager.setSenderExceptionForTokenForwardingRule(token.address, user, true, { from: owner }).should.be
           .fulfilled
 
-        expect(await manager.destinationLane(token.address, user, user2)).to.be.bignumber.equal('1')
-        expect(await manager.destinationLane(token.address, user2, user2)).to.be.bignumber.equal('-1')
+        expect(await manager.destinationLane(token.address, user, user2)).to.be.bignumber.equal('-1')
+        expect(await manager.destinationLane(token.address, user2, user2)).to.be.bignumber.equal('1')
 
         await manager.setSenderExceptionForTokenForwardingRule(token.address, user, false, { from: owner }).should.be
           .fulfilled
@@ -2204,8 +2204,8 @@ function runTests(accounts, isHome) {
         await manager.setReceiverExceptionForTokenForwardingRule(token.address, user, true, { from: owner }).should.be
           .fulfilled
 
-        expect(await manager.destinationLane(token.address, user, user)).to.be.bignumber.equal('1')
-        expect(await manager.destinationLane(token.address, user, user2)).to.be.bignumber.equal('-1')
+        expect(await manager.destinationLane(token.address, user, user)).to.be.bignumber.equal('-1')
+        expect(await manager.destinationLane(token.address, user, user2)).to.be.bignumber.equal('1')
 
         await manager.setTokenForwardingRule(token.address, false, { from: owner }).should.be.fulfilled
 
@@ -2214,12 +2214,12 @@ function runTests(accounts, isHome) {
         await manager.setSenderForwardingRule(user2, true, { from: user }).should.be.rejected
         await manager.setSenderForwardingRule(user2, true, { from: owner }).should.be.fulfilled
 
-        expect(await manager.destinationLane(token.address, user2, user2)).to.be.bignumber.equal('-1')
+        expect(await manager.destinationLane(token.address, user2, user2)).to.be.bignumber.equal('1')
 
         await manager.setReceiverForwardingRule(user2, true, { from: user }).should.be.rejected
         await manager.setReceiverForwardingRule(user2, true, { from: owner }).should.be.fulfilled
 
-        expect(await manager.destinationLane(token.address, user, user2)).to.be.bignumber.equal('-1')
+        expect(await manager.destinationLane(token.address, user, user2)).to.be.bignumber.equal('1')
       })
 
       it('should send a message to the manual lane', async () => {
