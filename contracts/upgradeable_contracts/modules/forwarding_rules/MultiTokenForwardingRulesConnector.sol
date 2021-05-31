@@ -50,6 +50,7 @@ contract MultiTokenForwardingRulesConnector is Ownable {
         address _receiver
     ) internal view returns (bool) {
         MultiTokenForwardingRulesManager manager = forwardingRulesManager();
-        return address(manager) == address(0) || manager.destinationLane(_token, _sender, _receiver) >= 0;
+        // If the manager is defined the default behavior is to use manual lane
+        return address(manager) == address(0) || manager.destinationLane(_token, _sender, _receiver) > 0;
     }
 }
