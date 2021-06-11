@@ -43,6 +43,24 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
     }
 
     /**
+     * @dev Tells the module interface version that this contract supports.
+     * @return major value of the version
+     * @return minor value of the version
+     * @return patch value of the version
+     */
+    function getModuleInterfacesVersion()
+        external
+        pure
+        returns (
+            uint64 major,
+            uint64 minor,
+            uint64 patch
+        )
+    {
+        return (1, 0, 0);
+    }
+
+    /**
      * @dev Enables support for interest earning through specific cToken.
      * @param _cToken address of the cToken contract. Underlying token address is derived from this contract.
      * @param _dust small amount of underlying tokens that cannot be paid as an interest. Accounts for possible truncation errors.

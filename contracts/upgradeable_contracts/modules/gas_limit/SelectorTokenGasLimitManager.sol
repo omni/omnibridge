@@ -26,6 +26,24 @@ contract SelectorTokenGasLimitManager is OwnableModule {
     }
 
     /**
+     * @dev Tells the module interface version that this contract supports.
+     * @return major value of the version
+     * @return minor value of the version
+     * @return patch value of the version
+     */
+    function getModuleInterfacesVersion()
+        external
+        pure
+        returns (
+            uint64 major,
+            uint64 minor,
+            uint64 patch
+        )
+    {
+        return (1, 0, 0);
+    }
+
+    /**
      * @dev Throws if provided gas limit is greater then the maximum allowed gas limit in the AMB contract.
      * @param _gasLimit gas limit value to check.
      */
