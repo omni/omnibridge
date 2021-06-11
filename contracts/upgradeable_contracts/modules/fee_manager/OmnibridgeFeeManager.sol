@@ -56,6 +56,24 @@ contract OmnibridgeFeeManager is MediatorOwnableModule {
     }
 
     /**
+     * @dev Tells the module interface version that this contract supports.
+     * @return major value of the version
+     * @return minor value of the version
+     * @return patch value of the version
+     */
+    function getModuleInterfacesVersion()
+        external
+        pure
+        returns (
+            uint64 major,
+            uint64 minor,
+            uint64 patch
+        )
+    {
+        return (1, 0, 0);
+    }
+
+    /**
      * @dev Throws if given fee amount is invalid.
      */
     modifier validFee(uint256 _fee) {
