@@ -2,26 +2,24 @@ pragma solidity 0.7.5;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "../../../interfaces/ICToken.sol";
-import "../../../interfaces/IComptroller.sol";
+import "../../../interfaces/IAToken.sol";
 import "../../../interfaces/IOwnable.sol";
 import "../../../interfaces/IInterestReceiver.sol";
 import "../../../interfaces/IInterestImplementation.sol";
+import "../../../interfaces/ILendingPool.sol";
 import "../MediatorOwnableModule.sol";
 
 /**
- * @title CompoundInterestERC20
- * @dev This contract contains token-specific logic for investing ERC20 tokens into Compound protocol.
+ * @title AAVEInterestERC20
+ * @dev This contract contains token-specific logic for investing ERC20 tokens into AAVE protocol.
  */
-contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule {
+contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
     using SafeMath for uint256;
 
     event PaidInterest(address indexed token, address to, uint256 value);
 
-    uint256 internal constant SUCCESS = 0;
-
     struct InterestParams {
-        ICToken cToken;
+        IAToken aToken;
         uint96 dust;
         uint256 investedAmount;
         address interestReceiver;
@@ -29,18 +27,8 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
     }
 
     mapping(address => InterestParams) public interestParams;
-    uint256 public minCompPaid;
-    address public compReceiver;
 
-    constructor(
-        address _omnibridge,
-        address _owner,
-        uint256 _minCompPaid,
-        address _compReceiver
-    ) MediatorOwnableModule(_omnibridge, _owner) {
-        minCompPaid = _minCompPaid;
-        compReceiver = _compReceiver;
-    }
+    constructor(address _omnibridge, address _owner) MediatorOwnableModule(_omnibridge, _owner) {}
 
     /**
      * @dev Tells the module interface version that this contract supports.
@@ -61,25 +49,32 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
     }
 
     /**
-     * @dev Enables support for interest earning through specific cToken.
-     * @param _cToken address of the cToken contract. Underlying token address is derived from this contract.
+     * @dev Tells the address of the LendingPool contract in the Ethereum Mainnet.
+     */
+    function lendingPool() public pure virtual returns (ILendingPool) {
+        return ILendingPool(0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9);
+    }
+
+    /**
+     * @dev Enables support for interest earning through specific aToken.
+     * @param _aToken address of the aToken contract. Underlying token address is derived from this contract.
      * @param _dust small amount of underlying tokens that cannot be paid as an interest. Accounts for possible truncation errors.
      * @param _interestReceiver address of the interest receiver for underlying token and associated COMP tokens.
      * @param _minInterestPaid min amount of underlying tokens to be paid as an interest.
      */
     function enableInterestToken(
-        ICToken _cToken,
+        IAToken _aToken,
         uint96 _dust,
         address _interestReceiver,
         uint256 _minInterestPaid
     ) external onlyOwner {
-        address token = _cToken.underlying();
+        address token = _aToken.UNDERLYING_ASSET_ADDRESS();
         // disallow reinitialization of tokens that were already initialized and invested
         require(interestParams[token].investedAmount == 0);
 
-        interestParams[token] = InterestParams(_cToken, _dust, 0, _interestReceiver, _minInterestPaid);
+        interestParams[token] = InterestParams(_aToken, _dust, 0, _interestReceiver, _minInterestPaid);
 
-        IERC20(token).approve(address(_cToken), uint256(-1));
+        IERC20(token).approve(address(lendingPool()), uint256(-1));
     }
 
     /**
@@ -92,45 +87,31 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
     }
 
     /**
-     * @dev Tells the address of the COMP token in the Ethereum Mainnet.
-     */
-    function compToken() public pure virtual returns (IERC20) {
-        return IERC20(0xc00e94Cb662C3520282E6f5717214004A7f26888);
-    }
-
-    /**
-     * @dev Tells the address of the Comptroller contract in the Ethereum Mainnet.
-     */
-    function comptroller() public pure virtual returns (IComptroller) {
-        return IComptroller(0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B);
-    }
-
-    /**
      * @dev Tells if interest earning is supported for the specific underlying token contract.
      * @param _token address of the token contract.
      * @return true, if interest earning is supported for the given token.
      */
     function isInterestSupported(address _token) external view override returns (bool) {
-        return address(interestParams[_token].cToken) != address(0);
+        return address(interestParams[_token].aToken) != address(0);
     }
 
     /**
-     * @dev Invests the given amount of tokens to the Compound protocol.
+     * @dev Invests the given amount of tokens to the AAVE protocol.
      * Only Omnibridge contract is allowed to call this method.
-     * Converts _amount of TOKENs into X cTOKENs.
+     * Converts _amount of TOKENs into aTOKENs.
      * @param _token address of the invested token contract.
      * @param _amount amount of tokens to invest.
      */
     function invest(address _token, uint256 _amount) external override onlyMediator {
         InterestParams storage params = interestParams[_token];
         params.investedAmount = params.investedAmount.add(_amount);
-        require(params.cToken.mint(_amount) == SUCCESS);
+        lendingPool().deposit(_token, _amount, address(this), 0);
     }
 
     /**
-     * @dev Withdraws at least the given amount of tokens from the Compound protocol.
+     * @dev Withdraws at least the given amount of tokens from the AAVE protocol.
      * Only Omnibridge contract is allowed to call this method.
-     * Converts X cTOKENs into _amount of TOKENs.
+     * Converts aTOKENs into _amount of TOKENs.
      * @param _token address of the invested token contract.
      * @param _amount minimal amount of tokens to withdraw.
      */
@@ -147,10 +128,10 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      * @param _token address of the invested token contract.
      * @return amount of accumulated interest.
      */
-    function interestAmount(address _token) public returns (uint256) {
+    function interestAmount(address _token) public view returns (uint256) {
         InterestParams storage params = interestParams[_token];
-        (ICToken cToken, uint96 dust) = (params.cToken, params.dust);
-        uint256 balance = cToken.balanceOfUnderlying(address(this));
+        (IAToken aToken, uint96 dust) = (params.aToken, params.dust);
+        uint256 balance = aToken.balanceOf(address(this));
         // small portion of tokens are reserved for possible truncation/round errors
         uint256 reserved = params.investedAmount.add(dust);
         return balance > reserved ? balance - reserved : 0;
@@ -170,29 +151,6 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
     }
 
     /**
-     * @dev Tells the amount of earned COMP tokens for supplying assets into the protocol that can be withdrawn.
-     * Intended to be called via eth_call to obtain the current accumulated value for COMP.
-     * @return amount of accumulated COMP tokens across given markets.
-     */
-    function compAmount(address[] calldata _markets) public returns (uint256) {
-        address[] memory holders = new address[](1);
-        holders[0] = address(this);
-        comptroller().claimComp(holders, _markets, false, true);
-
-        return compToken().balanceOf(address(this));
-    }
-
-    /**
-     * @dev Claims Comp token received by supplying underlying tokens and transfers it to the associated COMP receiver.
-     * @param _markets cTokens addresses to claim COMP for.
-     */
-    function claimCompAndPay(address[] calldata _markets) external {
-        uint256 balance = compAmount(_markets);
-        require(balance >= minCompPaid);
-        _transferInterest(compReceiver, address(compToken()), balance);
-    }
-
-    /**
      * @dev Last-resort function for returning assets to the Omnibridge contract in case of some failures in the logic.
      * Disables this contract and transfers locked tokens back to the mediator.
      * Only owner is allowed to call this method.
@@ -200,17 +158,18 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      */
     function forceDisable(address _token) external onlyOwner {
         InterestParams storage params = interestParams[_token];
-        ICToken cToken = params.cToken;
+        IAToken aToken = params.aToken;
 
-        uint256 cTokenBalance = cToken.balanceOf(address(this));
+        uint256 aTokenBalance = aToken.balanceOf(address(this));
         // try to redeem all cTokens
-        if (cToken.redeem(cTokenBalance) != SUCCESS) {
-            // transfer cTokens as-is, if redeem has failed
-            cToken.transfer(mediator, cTokenBalance);
+        try lendingPool().withdraw(_token, aTokenBalance, mediator) {
+            uint256 balance = IERC20(_token).balanceOf(address(this));
+            IERC20(_token).transfer(mediator, balance);
+        } catch {
+            aToken.transfer(mediator, aTokenBalance);
         }
-        IERC20(_token).transfer(mediator, IERC20(_token).balanceOf(address(this)));
 
-        delete params.cToken;
+        delete params.aToken;
         delete params.dust;
         delete params.investedAmount;
         delete params.minInterestPaid;
@@ -239,34 +198,15 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
     }
 
     /**
-     * @dev Updates min COMP amount that can be transferred in single call.
-     * Only owner is allowed to call this method.
-     * @param _minCompPaid new amount of COMP and can be transferred to the interest receiver in single operation.
-     */
-    function setMinCompPaid(uint256 _minCompPaid) external onlyOwner {
-        minCompPaid = _minCompPaid;
-    }
-
-    /**
-     * @dev Updates address of the accumulated COMP receiver. Can be any address, EOA or contract.
-     * Set to 0x00..00 to disable COMP claims and transfers.
-     * Only owner is allowed to call this method.
-     * @param _receiver address of the interest receiver.
-     */
-    function setCompReceiver(address _receiver) external onlyOwner {
-        compReceiver = _receiver;
-    }
-
-    /**
      * @dev Internal function for securely withdrawing assets from the underlying protocol.
      * @param _token address of the invested token contract.
-     * @param _amount minimal amount of underlying tokens to withdraw from Compound.
+     * @param _amount minimal amount of underlying tokens to withdraw from AAVE.
      * @return amount of redeemed tokens, at least as much as was requested.
      */
     function _safeWithdraw(address _token, uint256 _amount) private returns (uint256) {
         uint256 balance = IERC20(_token).balanceOf(address(this));
 
-        require(interestParams[_token].cToken.redeemUnderlying(_amount) == SUCCESS);
+        lendingPool().withdraw(_token, _amount, address(this));
 
         uint256 redeemed = IERC20(_token).balanceOf(address(this)) - balance;
 

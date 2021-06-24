@@ -14,3 +14,10 @@ services:
     tty: true
     extra_hosts:
       - "host.docker.internal:host-gateway"
+  aave:
+    image: kirillfedoseev/aave-test-deploy
+    # build: aave
+    environment:
+      - PROVIDER
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
