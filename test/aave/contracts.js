@@ -1,7 +1,6 @@
 const IERC20 = artifacts.require('IERC20')
 const IMintableERC20 = artifacts.require('IMintableERC20')
 const ILendingPool = artifacts.require('ILendingPool')
-// const IAToken = artifacts.require('IAToken')
 
 async function getAAVEContracts() {
   const dai = await IMintableERC20.at('0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab')

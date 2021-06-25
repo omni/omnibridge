@@ -78,7 +78,7 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
     }
 
     /**
-     * @dev Tells the current amount of underlying tokens that was invested into the Compound protocol.
+     * @dev Tells the current amount of underlying tokens that was invested into the AAVE protocol.
      * @param _token address of the underlying token.
      * @return currently invested value.
      */
@@ -161,7 +161,7 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
         IAToken aToken = params.aToken;
 
         uint256 aTokenBalance = aToken.balanceOf(address(this));
-        // try to redeem all cTokens
+        // try to redeem all aTokens
         try lendingPool().withdraw(_token, aTokenBalance, mediator) {
             uint256 balance = IERC20(_token).balanceOf(address(this));
             IERC20(_token).transfer(mediator, balance);

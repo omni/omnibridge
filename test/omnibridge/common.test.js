@@ -2466,7 +2466,7 @@ function runTests(accounts, isHome) {
       })
     })
 
-    describe.only('aave connector', () => {
+    describe('aave connector', () => {
       let dai
       let usdc
       let aDai
@@ -2560,7 +2560,6 @@ function runTests(accounts, isHome) {
         await contract.invest(dai.address).should.be.fulfilled
         await generateInterest()
 
-        console.log(await daiInterestImpl.interestAmount(dai.address))
         expect(await daiInterestImpl.interestAmount(dai.address)).to.be.bignumber.gt(ether('0.01'))
 
         await daiInterestImpl.payInterest(dai.address).should.be.fulfilled
