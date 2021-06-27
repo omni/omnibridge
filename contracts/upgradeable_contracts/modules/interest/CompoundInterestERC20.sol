@@ -17,6 +17,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
     using SafeMath for uint256;
 
     event PaidInterest(address indexed token, address to, uint256 value);
+    event ForceDisable(address token, uint256 tokensAmount, uint256 cTokensAmount, uint256 investedAmount);
 
     uint256 internal constant SUCCESS = 0;
 
@@ -204,11 +205,17 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
 
         uint256 cTokenBalance = cToken.balanceOf(address(this));
         // try to redeem all cTokens
-        if (cToken.redeem(cTokenBalance) != SUCCESS) {
+        if (cToken.redeem(cTokenBalance) == SUCCESS) {
+            cTokenBalance = 0;
+        } else {
             // transfer cTokens as-is, if redeem has failed
             cToken.transfer(mediator, cTokenBalance);
         }
-        IERC20(_token).transfer(mediator, IERC20(_token).balanceOf(address(this)));
+
+        uint256 balance = IERC20(_token).balanceOf(address(this));
+        IERC20(_token).transfer(mediator, balance);
+
+        emit ForceDisable(_token, balance, cTokenBalance, params.investedAmount);
 
         delete params.cToken;
         delete params.dust;

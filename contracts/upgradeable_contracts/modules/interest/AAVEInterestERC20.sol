@@ -17,6 +17,7 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
     using SafeMath for uint256;
 
     event PaidInterest(address indexed token, address to, uint256 value);
+    event ForceDisable(address token, uint256 tokensAmount, uint256 aTokensAmount, uint256 investedAmount);
 
     struct InterestParams {
         IAToken aToken;
@@ -163,11 +164,15 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
         uint256 aTokenBalance = aToken.balanceOf(address(this));
         // try to redeem all aTokens
         try lendingPool().withdraw(_token, aTokenBalance, mediator) {
-            uint256 balance = IERC20(_token).balanceOf(address(this));
-            IERC20(_token).transfer(mediator, balance);
+            aTokenBalance = 0;
         } catch {
             aToken.transfer(mediator, aTokenBalance);
         }
+
+        uint256 balance = IERC20(_token).balanceOf(address(this));
+        IERC20(_token).transfer(mediator, balance);
+
+        emit ForceDisable(_token, balance, aTokenBalance, params.investedAmount);
 
         delete params.aToken;
         delete params.dust;
