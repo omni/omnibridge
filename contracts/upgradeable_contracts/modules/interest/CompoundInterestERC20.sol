@@ -218,6 +218,16 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
     }
 
     /**
+     * @dev Updates dust parameter for the particular token.
+     * Only owner is allowed to call this method.
+     * @param _token address of the invested token contract.
+     * @param _dust new amount of underlying tokens that cannot be paid as an interest. Accounts for possible truncation errors.
+     */
+    function setDust(address _token, uint96 _dust) external onlyOwner {
+        interestParams[_token].dust = _dust;
+    }
+
+    /**
      * @dev Updates address of the interest receiver. Can be any address, EOA or contract.
      * Set to 0x00..00 to disable interest transfers.
      * Only owner is allowed to call this method.

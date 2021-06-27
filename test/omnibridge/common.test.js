@@ -2363,6 +2363,10 @@ function runTests(accounts, isHome) {
         await contract.setMinCashThreshold(dai.address, ether('2'), { from: owner }).should.be.fulfilled
         expect(await contract.minCashThreshold(dai.address)).to.be.bignumber.equal(ether('2'))
 
+        await daiInterestImpl.setDust(dai.address, '1', { from: user }).should.be.rejected
+        await daiInterestImpl.setDust(dai.address, '1', { from: owner }).should.be.fulfilled
+        expect((await daiInterestImpl.interestParams(dai.address)).dust).to.be.bignumber.equal('1')
+
         await daiInterestImpl.setMinInterestPaid(dai.address, oneEther, { from: user }).should.be.rejected
         await daiInterestImpl.setMinInterestPaid(dai.address, oneEther, { from: owner }).should.be.fulfilled
         expect((await daiInterestImpl.interestParams(dai.address)).minInterestPaid).to.be.bignumber.equal(oneEther)
@@ -2591,6 +2595,10 @@ function runTests(accounts, isHome) {
         await contract.setMinCashThreshold(dai.address, ether('2'), { from: user }).should.be.rejected
         await contract.setMinCashThreshold(dai.address, ether('2'), { from: owner }).should.be.fulfilled
         expect(await contract.minCashThreshold(dai.address)).to.be.bignumber.equal(ether('2'))
+
+        await daiInterestImpl.setDust(dai.address, '1', { from: user }).should.be.rejected
+        await daiInterestImpl.setDust(dai.address, '1', { from: owner }).should.be.fulfilled
+        expect((await daiInterestImpl.interestParams(dai.address)).dust).to.be.bignumber.equal('1')
 
         await daiInterestImpl.setMinInterestPaid(dai.address, oneEther, { from: user }).should.be.rejected
         await daiInterestImpl.setMinInterestPaid(dai.address, oneEther, { from: owner }).should.be.fulfilled
