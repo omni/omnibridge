@@ -24,6 +24,9 @@ if [ "$SOLIDITY_COVERAGE" = true ]; then
     sleep 0.5
   done
 
+  echo "Deploy AAVE protocol contracts"
+  PROVIDER=http://host.docker.internal:8545 docker-compose -f test/docker-compose.yml up aave
+
   echo "Deploy Compound protocol contracts"
   PROVIDER=http://host.docker.internal:8545 docker-compose -f test/docker-compose.yml up compound || true
 
@@ -37,6 +40,9 @@ else
     sleep 5
     echo "Deploy Compound protocol contracts"
     PROVIDER=http://ganache:8545 docker-compose -f test/docker-compose.yml up compound || true
+
+    echo "Deploy AAVE protocol contracts"
+    PROVIDER=http://ganache:8545 docker-compose -f test/docker-compose.yml up aave
   fi
 
   node --max-old-space-size=4096 node_modules/.bin/truffle test --network ganache "$@"

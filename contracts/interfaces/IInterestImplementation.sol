@@ -10,6 +10,4 @@ interface IInterestImplementation {
     function withdraw(address _token, uint256 _amount) external;
 
     function investedAmount(address _token) external view returns (uint256);
-
-    function claimCompAndPay(address[] calldata _markets) external;
 }

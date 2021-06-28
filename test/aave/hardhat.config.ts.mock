@@ -1,0 +1,68 @@
+import path from 'path';
+import fs from 'fs';
+import { HardhatUserConfig } from 'hardhat/types';
+// @ts-ignore
+import { eNetwork } from './helpers/types';
+
+require('dotenv').config();
+
+import '@nomiclabs/hardhat-ethers';
+import '@nomiclabs/hardhat-waffle';
+import 'temp-hardhat-etherscan';
+import 'hardhat-gas-reporter';
+import 'hardhat-typechain';
+import '@tenderly/hardhat-tenderly';
+import 'solidity-coverage';
+
+const SKIP_LOAD = process.env.SKIP_LOAD === 'true';
+const ETHERSCAN_KEY = process.env.ETHERSCAN_KEY || '';
+
+// Prevent to load scripts before compilation and typechain
+if (!SKIP_LOAD) {
+  ['misc', 'migrations', 'dev', 'full', 'verifications', 'deployments', 'helpers'].forEach(
+    (folder) => {
+      const tasksPath = path.join(__dirname, 'tasks', folder);
+      fs.readdirSync(tasksPath)
+        .filter((pth) => pth.includes('.ts'))
+        .forEach((task) => {
+          require(`${tasksPath}/${task}`);
+        });
+    }
+  );
+}
+
+require(`${path.join(__dirname, 'tasks/misc')}/set-bre.ts`);
+
+const buidlerConfig: HardhatUserConfig = {
+  solidity: {
+    version: '0.6.12',
+    settings: {
+      optimizer: { enabled: true, runs: 200 },
+      evmVersion: 'istanbul',
+    },
+  },
+  typechain: {
+    outDir: 'types',
+    target: 'ethers-v5',
+  },
+  etherscan: {
+    apiKey: ETHERSCAN_KEY,
+  },
+  mocha: {
+    timeout: 0,
+  },
+  tenderly: {
+    project: process.env.TENDERLY_PROJECT || '',
+    username: process.env.TENDERLY_USERNAME || '',
+    forkNetwork: '1', //Network id of the network we want to fork
+  },
+  networks: {
+    coverage: {
+      url: process.env.PROVIDER || 'http://ganache:8545',
+      accounts: 'remote',
+      chainId: 1337,
+    },
+  },
+};
+
+export default buidlerConfig;
