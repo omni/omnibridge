@@ -11,6 +11,8 @@ RUN npm i
 
 RUN npm run compile
 
-COPY hardhat.config.ts .
+COPY hardhat.config.ts.mock hardhat.config.ts
+
+ENV PROVIDER='http://ganache:8545'
 
 ENTRYPOINT npx hardhat --network coverage aave:dev
