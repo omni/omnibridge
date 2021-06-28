@@ -2676,8 +2676,7 @@ function runTests(accounts, isHome) {
 
         await contract.disableInterest(dai.address, { from: owner }).should.be.fulfilled
 
-        await daiInterestImpl.enableInterestToken(dai.address, oneEther, accounts[2], ether('0.01')).should.be
-          .fulfilled
+        await daiInterestImpl.enableInterestToken(dai.address, oneEther, accounts[2], ether('0.01')).should.be.fulfilled
         await contract.initializeInterest(dai.address, daiInterestImpl.address, oneEther)
         await contract.invest(dai.address)
       })
