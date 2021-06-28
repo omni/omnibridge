@@ -57,25 +57,27 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
     }
 
     /**
-     * @dev Enables support for interest earning through specific aToken.
-     * @param _aToken address of the aToken contract. Underlying token address is derived from this contract.
+     * @dev Enables support for interest earning through a specific aToken.
+     * @param _token address of the token contract for which to enable interest.
      * @param _dust small amount of underlying tokens that cannot be paid as an interest. Accounts for possible truncation errors.
      * @param _interestReceiver address of the interest receiver for underlying token and associated COMP tokens.
      * @param _minInterestPaid min amount of underlying tokens to be paid as an interest.
      */
     function enableInterestToken(
-        IAToken _aToken,
+        address _token,
         uint96 _dust,
         address _interestReceiver,
         uint256 _minInterestPaid
     ) external onlyOwner {
-        address token = _aToken.UNDERLYING_ASSET_ADDRESS();
+        IAToken aToken = IAToken(lendingPool().getReserveData(_token)[7]);
+        require(aToken.UNDERLYING_ASSET_ADDRESS() == _token);
+
         // disallow reinitialization of tokens that were already initialized and invested
-        require(interestParams[token].investedAmount == 0);
+        require(interestParams[_token].investedAmount == 0);
 
-        interestParams[token] = InterestParams(_aToken, _dust, 0, _interestReceiver, _minInterestPaid);
+        interestParams[_token] = InterestParams(aToken, _dust, 0, _interestReceiver, _minInterestPaid);
 
-        IERC20(token).approve(address(lendingPool()), uint256(-1));
+        IERC20(_token).approve(address(lendingPool()), uint256(-1));
     }
 
     /**

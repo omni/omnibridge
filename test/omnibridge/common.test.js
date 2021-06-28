@@ -2514,7 +2514,7 @@ function runTests(accounts, isHome) {
           executionLimits: [ether('100'), ether('99')],
         })
         daiInterestImpl = await AAVEInterestERC20.new(contract.address, owner)
-        await daiInterestImpl.enableInterestToken(aDai.address, '1', accounts[2], ether('0.01'))
+        await daiInterestImpl.enableInterestToken(dai.address, '1', accounts[2], ether('0.01'))
         await dai.approve(contract.address, ether('100'))
         await contract.methods['relayTokens(address,uint256)'](dai.address, ether('10'))
       })
@@ -2672,11 +2672,11 @@ function runTests(accounts, isHome) {
         await contract.invest(dai.address)
         await generateInterest()
 
-        await daiInterestImpl.enableInterestToken(aDai.address, oneEther, accounts[2], ether('0.01')).should.be.rejected
+        await daiInterestImpl.enableInterestToken(dai.address, oneEther, accounts[2], ether('0.01')).should.be.rejected
 
         await contract.disableInterest(dai.address, { from: owner }).should.be.fulfilled
 
-        await daiInterestImpl.enableInterestToken(aDai.address, oneEther, accounts[2], ether('0.01')).should.be
+        await daiInterestImpl.enableInterestToken(dai.address, oneEther, accounts[2], ether('0.01')).should.be
           .fulfilled
         await contract.initializeInterest(dai.address, daiInterestImpl.address, oneEther)
         await contract.invest(dai.address)
