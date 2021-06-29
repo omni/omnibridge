@@ -18,6 +18,24 @@ contract MultiTokenForwardingRulesManager is OwnableModule {
     constructor(address _owner) OwnableModule(_owner) {}
 
     /**
+     * @dev Tells the module interface version that this contract supports.
+     * @return major value of the version
+     * @return minor value of the version
+     * @return patch value of the version
+     */
+    function getModuleInterfacesVersion()
+        external
+        pure
+        returns (
+            uint64 major,
+            uint64 minor,
+            uint64 patch
+        )
+    {
+        return (1, 0, 0);
+    }
+
+    /**
      * @dev Tells the destination lane for a particular bridge operation by checking several wildcard forwarding rules.
      * @param _token address of the token contract on the foreign side of the bridge.
      * @param _sender address of the tokens sender on the home side of the bridge.
@@ -34,7 +52,7 @@ contract MultiTokenForwardingRulesManager is OwnableModule {
     ) public view returns (int256) {
         int256 defaultLane = forwardingRule[_token][ANY_ADDRESS][ANY_ADDRESS]; // specific token for all senders and receivers
         int256 lane;
-        if (defaultLane < 0) {
+        if (defaultLane > 0) {
             lane = forwardingRule[_token][_sender][ANY_ADDRESS]; // specific token for specific sender
             if (lane != 0) return lane;
             lane = forwardingRule[_token][ANY_ADDRESS][_receiver]; // specific token for specific receiver
@@ -50,19 +68,19 @@ contract MultiTokenForwardingRulesManager is OwnableModule {
      * Updates the forwarding rule for bridging specific token.
      * Only owner can call this method.
      * @param _token address of the token contract on the foreign side.
-     * @param _enable true, if bridge operations for a given token should be forwarded to the manual lane.
+     * @param _enable true, if bridge operations for a given token should be forwarded to the oracle-driven lane.
      */
     function setTokenForwardingRule(address _token, bool _enable) external {
         require(_token != ANY_ADDRESS);
-        _setForwardingRule(_token, ANY_ADDRESS, ANY_ADDRESS, _enable ? int256(-1) : int256(0));
+        _setForwardingRule(_token, ANY_ADDRESS, ANY_ADDRESS, _enable ? int256(1) : int256(0));
     }
 
     /**
-     * Allows a particular address to send bridge requests to the oracle-driven lane for a particular token.
+     * Allows a particular address to send bridge requests to the manual lane for a particular token.
      * Only owner can call this method.
      * @param _token address of the token contract on the foreign side.
      * @param _sender address of the tokens sender on the home side of the bridge.
-     * @param _enable true, if bridge operations for a given token and sender should be forwarded to the oracle-driven lane.
+     * @param _enable true, if bridge operations for a given token and sender should be forwarded to the manual lane.
      */
     function setSenderExceptionForTokenForwardingRule(
         address _token,
@@ -71,15 +89,15 @@ contract MultiTokenForwardingRulesManager is OwnableModule {
     ) external {
         require(_token != ANY_ADDRESS);
         require(_sender != ANY_ADDRESS);
-        _setForwardingRule(_token, _sender, ANY_ADDRESS, _enable ? int256(1) : int256(0));
+        _setForwardingRule(_token, _sender, ANY_ADDRESS, _enable ? int256(-1) : int256(0));
     }
 
     /**
-     * Allows a particular address to receive bridged tokens from the oracle-driven lane for a particular token.
+     * Allows a particular address to receive bridged tokens from the manual lane for a particular token.
      * Only owner can call this method.
      * @param _token address of the token contract on the foreign side.
      * @param _receiver address of the tokens receiver on the foreign side of the bridge.
-     * @param _enable true, if bridge operations for a given token and receiver should be forwarded to the oracle-driven lane.
+     * @param _enable true, if bridge operations for a given token and receiver should be forwarded to the manual lane.
      */
     function setReceiverExceptionForTokenForwardingRule(
         address _token,
@@ -88,29 +106,29 @@ contract MultiTokenForwardingRulesManager is OwnableModule {
     ) external {
         require(_token != ANY_ADDRESS);
         require(_receiver != ANY_ADDRESS);
-        _setForwardingRule(_token, ANY_ADDRESS, _receiver, _enable ? int256(1) : int256(0));
+        _setForwardingRule(_token, ANY_ADDRESS, _receiver, _enable ? int256(-1) : int256(0));
     }
 
     /**
      * Updates the forwarding rule for the specific sender.
      * Only owner can call this method.
      * @param _sender address of the tokens sender on the home side.
-     * @param _enable true, if all bridge operations from a given sender should be forwarded to the manual lane.
+     * @param _enable true, if all bridge operations from a given sender should be forwarded to the oracle-driven lane.
      */
     function setSenderForwardingRule(address _sender, bool _enable) external {
         require(_sender != ANY_ADDRESS);
-        _setForwardingRule(ANY_ADDRESS, _sender, ANY_ADDRESS, _enable ? int256(-1) : int256(0));
+        _setForwardingRule(ANY_ADDRESS, _sender, ANY_ADDRESS, _enable ? int256(1) : int256(0));
     }
 
     /**
      * Updates the forwarding rule for the specific receiver.
      * Only owner can call this method.
      * @param _receiver address of the tokens receiver on the foreign side.
-     * @param _enable true, if all bridge operations to a given receiver should be forwarded to the manual lane.
+     * @param _enable true, if all bridge operations to a given receiver should be forwarded to the oracle-driven lane.
      */
     function setReceiverForwardingRule(address _receiver, bool _enable) external {
         require(_receiver != ANY_ADDRESS);
-        _setForwardingRule(ANY_ADDRESS, ANY_ADDRESS, _receiver, _enable ? int256(-1) : int256(0));
+        _setForwardingRule(ANY_ADDRESS, ANY_ADDRESS, _receiver, _enable ? int256(1) : int256(0));
     }
 
     /**

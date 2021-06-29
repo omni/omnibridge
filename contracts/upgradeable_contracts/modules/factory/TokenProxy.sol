@@ -76,4 +76,19 @@ contract TokenProxy is Proxy {
             impl := sload(0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc)
         }
     }
+
+    /**
+     * @dev Tells the current version of the token proxy interfaces.
+     */
+    function getTokenProxyInterfacesVersion()
+        external
+        pure
+        returns (
+            uint64 major,
+            uint64 minor,
+            uint64 patch
+        )
+    {
+        return (1, 0, 0);
+    }
 }

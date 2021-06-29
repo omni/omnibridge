@@ -20,6 +20,24 @@ contract TokenFactory is OwnableModule {
     }
 
     /**
+     * @dev Tells the module interface version that this contract supports.
+     * @return major value of the version
+     * @return minor value of the version
+     * @return patch value of the version
+     */
+    function getModuleInterfacesVersion()
+        external
+        pure
+        returns (
+            uint64 major,
+            uint64 minor,
+            uint64 patch
+        )
+    {
+        return (1, 0, 0);
+    }
+
+    /**
      * @dev Updates the address of the used token image contract.
      * Only owner can call this method.
      * @param _tokenImage address of the new token image used for further deployments.

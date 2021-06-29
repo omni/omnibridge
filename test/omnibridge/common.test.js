@@ -9,11 +9,13 @@ const OmnibridgeFeeManager = artifacts.require('OmnibridgeFeeManager')
 const SelectorTokenGasLimitManager = artifacts.require('SelectorTokenGasLimitManager')
 const TokenReceiver = artifacts.require('TokenReceiver')
 const CompoundInterestERC20 = artifacts.require('CompoundInterestERC20Mock')
+const AAVEInterestERC20 = artifacts.require('AAVEInterestERC20Mock')
 
 const { expect } = require('chai')
 const { getEvents, ether, expectEventInLogs } = require('../helpers/helpers')
 const { ZERO_ADDRESS, toBN, requirePrecompiled } = require('../setup')
 const getCompoundContracts = require('../compound/contracts')
+const getAAVEContracts = require('../aave/contracts')
 
 const ZERO = toBN(0)
 const halfEther = ether('0.5')
@@ -2187,15 +2189,15 @@ function runTests(accounts, isHome) {
         await manager.setTokenForwardingRule(token.address, true, { from: user }).should.be.rejected
         await manager.setTokenForwardingRule(token.address, true, { from: owner }).should.be.fulfilled
 
-        expect(await manager.destinationLane(token.address, user, user2)).to.be.bignumber.equal('-1')
+        expect(await manager.destinationLane(token.address, user, user2)).to.be.bignumber.equal('1')
 
         await manager.setSenderExceptionForTokenForwardingRule(token.address, user, true, { from: user }).should.be
           .rejected
         await manager.setSenderExceptionForTokenForwardingRule(token.address, user, true, { from: owner }).should.be
           .fulfilled
 
-        expect(await manager.destinationLane(token.address, user, user2)).to.be.bignumber.equal('1')
-        expect(await manager.destinationLane(token.address, user2, user2)).to.be.bignumber.equal('-1')
+        expect(await manager.destinationLane(token.address, user, user2)).to.be.bignumber.equal('-1')
+        expect(await manager.destinationLane(token.address, user2, user2)).to.be.bignumber.equal('1')
 
         await manager.setSenderExceptionForTokenForwardingRule(token.address, user, false, { from: owner }).should.be
           .fulfilled
@@ -2204,8 +2206,8 @@ function runTests(accounts, isHome) {
         await manager.setReceiverExceptionForTokenForwardingRule(token.address, user, true, { from: owner }).should.be
           .fulfilled
 
-        expect(await manager.destinationLane(token.address, user, user)).to.be.bignumber.equal('1')
-        expect(await manager.destinationLane(token.address, user, user2)).to.be.bignumber.equal('-1')
+        expect(await manager.destinationLane(token.address, user, user)).to.be.bignumber.equal('-1')
+        expect(await manager.destinationLane(token.address, user, user2)).to.be.bignumber.equal('1')
 
         await manager.setTokenForwardingRule(token.address, false, { from: owner }).should.be.fulfilled
 
@@ -2214,15 +2216,15 @@ function runTests(accounts, isHome) {
         await manager.setSenderForwardingRule(user2, true, { from: user }).should.be.rejected
         await manager.setSenderForwardingRule(user2, true, { from: owner }).should.be.fulfilled
 
-        expect(await manager.destinationLane(token.address, user2, user2)).to.be.bignumber.equal('-1')
+        expect(await manager.destinationLane(token.address, user2, user2)).to.be.bignumber.equal('1')
 
         await manager.setReceiverForwardingRule(user2, true, { from: user }).should.be.rejected
         await manager.setReceiverForwardingRule(user2, true, { from: owner }).should.be.fulfilled
 
-        expect(await manager.destinationLane(token.address, user, user2)).to.be.bignumber.equal('-1')
+        expect(await manager.destinationLane(token.address, user, user2)).to.be.bignumber.equal('1')
       })
 
-      it('should send a message to the manual lane', async () => {
+      it('should send a message to the oracle-driven lane', async () => {
         await initialize().should.be.fulfilled
         await token.mint(user, ether('10'), { from: owner }).should.be.fulfilled
         const args = [otherSideToken1, 'Test', 'TST', 18, user, value]
@@ -2244,10 +2246,10 @@ function runTests(accounts, isHome) {
         expect(events.length).to.be.equal(6)
         expect(events[0].returnValues.dataType).to.be.bignumber.equal('0')
         expect(events[1].returnValues.dataType).to.be.bignumber.equal('0')
-        expect(events[2].returnValues.dataType).to.be.bignumber.equal('0')
-        expect(events[3].returnValues.dataType).to.be.bignumber.equal('0')
-        expect(events[4].returnValues.dataType).to.be.bignumber.equal('128')
-        expect(events[5].returnValues.dataType).to.be.bignumber.equal('128')
+        expect(events[2].returnValues.dataType).to.be.bignumber.equal('128')
+        expect(events[3].returnValues.dataType).to.be.bignumber.equal('128')
+        expect(events[4].returnValues.dataType).to.be.bignumber.equal('0')
+        expect(events[5].returnValues.dataType).to.be.bignumber.equal('0')
       })
     })
   }
@@ -2361,6 +2363,10 @@ function runTests(accounts, isHome) {
         await contract.setMinCashThreshold(dai.address, ether('2'), { from: owner }).should.be.fulfilled
         expect(await contract.minCashThreshold(dai.address)).to.be.bignumber.equal(ether('2'))
 
+        await daiInterestImpl.setDust(dai.address, '1', { from: user }).should.be.rejected
+        await daiInterestImpl.setDust(dai.address, '1', { from: owner }).should.be.fulfilled
+        expect((await daiInterestImpl.interestParams(dai.address)).dust).to.be.bignumber.equal('1')
+
         await daiInterestImpl.setMinInterestPaid(dai.address, oneEther, { from: user }).should.be.rejected
         await daiInterestImpl.setMinInterestPaid(dai.address, oneEther, { from: owner }).should.be.fulfilled
         expect((await daiInterestImpl.interestParams(dai.address)).minInterestPaid).to.be.bignumber.equal(oneEther)
@@ -2459,6 +2465,218 @@ function runTests(accounts, isHome) {
 
         await daiInterestImpl.enableInterestToken(cDai.address, oneEther, accounts[2], ether('0.01')).should.be
           .fulfilled
+        await contract.initializeInterest(dai.address, daiInterestImpl.address, oneEther)
+        await contract.invest(dai.address)
+      })
+    })
+
+    describe('aave connector', () => {
+      let dai
+      let usdc
+      let aDai
+      let lendingPool
+      let daiInterestImpl
+
+      const borrower = accounts[2]
+
+      before(async () => {
+        const contracts = await getAAVEContracts()
+        dai = contracts.dai
+        usdc = contracts.usdc
+        aDai = contracts.aDai
+        lendingPool = contracts.lendingPool
+
+        // create some preliminary deposit
+        await dai.mint(ether('10000000'))
+        await dai.approve(lendingPool.address, ether('10000000'))
+        await lendingPool.deposit(dai.address, ether('10000'), owner, 0)
+
+        // create collateral for borrower account
+        await usdc.mint(ether('1000000000'))
+        await usdc.approve(lendingPool.address, ether('1000000000'))
+        await lendingPool.deposit(usdc.address, ether('1000000000'), borrower, 0)
+
+        web3.extend({
+          property: 'evm',
+          methods: [
+            { name: 'mine', call: 'evm_mine' },
+            { name: 'mineWithTime', call: 'evm_mine', params: 1, inputFormatter: [web3.utils.numberToHex] },
+          ],
+        })
+      })
+
+      beforeEach(async () => {
+        const storageProxy = await EternalStorageProxy.new()
+        await storageProxy.upgradeTo('1', contract.address).should.be.fulfilled
+        contract = await Mediator.at(storageProxy.address)
+        await initialize({
+          limits: [ether('100'), ether('99'), ether('0.01')],
+          executionLimits: [ether('100'), ether('99')],
+        })
+        daiInterestImpl = await AAVEInterestERC20.new(contract.address, owner)
+        await daiInterestImpl.enableInterestToken(dai.address, '1', accounts[2], ether('0.01'))
+        await dai.approve(contract.address, ether('100'))
+        await contract.methods['relayTokens(address,uint256)'](dai.address, ether('10'))
+      })
+
+      async function generateInterest() {
+        const timestamp = (await web3.eth.getBlock('latest')).timestamp
+        await lendingPool.borrow(dai.address, ether('1000'), 1, 0, borrower, { from: borrower })
+        await web3.evm.mineWithTime(timestamp + 356 * 24 * 60 * 60).should.be.fulfilled
+        await lendingPool.repay(dai.address, ether('1000000'), 1, borrower) // repay whole debt
+      }
+
+      it('should initialize interest', async () => {
+        expect(await dai.balanceOf(contract.address)).to.be.bignumber.equal(ether('10'))
+        expect(await contract.interestImplementation(dai.address)).to.be.equal(ZERO_ADDRESS)
+
+        const args = [dai.address, daiInterestImpl.address, oneEther]
+        await contract.initializeInterest(...args, { from: user }).should.be.rejected
+        await contract.initializeInterest(...args, { from: owner }).should.be.fulfilled
+
+        expect(await dai.balanceOf(contract.address)).to.be.bignumber.equal(ether('10'))
+        expect(await aDai.balanceOf(contract.address)).to.be.bignumber.equal(ZERO)
+        expect(await contract.interestImplementation(dai.address)).to.be.equal(daiInterestImpl.address)
+        expect(await contract.minCashThreshold(dai.address)).to.be.bignumber.equal(oneEther)
+      })
+
+      it('should enable and earn interest', async () => {
+        const initialBalance = await dai.balanceOf(accounts[2])
+        await contract.initializeInterest(dai.address, daiInterestImpl.address, oneEther)
+
+        expect(await daiInterestImpl.interestAmount(dai.address)).to.be.bignumber.equal(ZERO)
+        await contract.invest(dai.address).should.be.fulfilled
+
+        expect(await dai.balanceOf(contract.address)).to.be.bignumber.equal(ether('1'))
+        expect(await dai.balanceOf(accounts[2])).to.be.bignumber.equal(initialBalance)
+        expect(await dai.balanceOf(daiInterestImpl.address)).to.be.bignumber.equal(ZERO)
+        expect(await aDai.balanceOf(daiInterestImpl.address)).to.be.bignumber.gt(ZERO)
+        expect(await daiInterestImpl.interestAmount(dai.address)).to.be.bignumber.equal(ZERO)
+
+        await generateInterest()
+
+        expect(await daiInterestImpl.interestAmount(dai.address)).to.be.bignumber.gt(ZERO)
+      })
+
+      it('should pay interest', async () => {
+        const initialBalance = await dai.balanceOf(accounts[2])
+        await contract.initializeInterest(dai.address, daiInterestImpl.address, oneEther)
+        await contract.invest(dai.address).should.be.fulfilled
+        await generateInterest()
+
+        expect(await daiInterestImpl.interestAmount(dai.address)).to.be.bignumber.gt(ether('0.01'))
+
+        await daiInterestImpl.payInterest(dai.address).should.be.fulfilled
+
+        expect(await dai.balanceOf(contract.address)).to.be.bignumber.equal(ether('1'))
+        expect(await dai.balanceOf(accounts[2])).to.be.bignumber.gt(initialBalance)
+        expect(await aDai.balanceOf(daiInterestImpl.address)).to.be.bignumber.gt(ZERO)
+        expect(await daiInterestImpl.interestAmount(dai.address)).to.be.bignumber.lt(ether('0.01'))
+      })
+
+      it('should disable interest', async () => {
+        await contract.initializeInterest(dai.address, daiInterestImpl.address, oneEther)
+        await contract.invest(dai.address).should.be.fulfilled
+        await generateInterest()
+        await daiInterestImpl.payInterest(dai.address).should.be.fulfilled
+
+        expect(await dai.balanceOf(contract.address)).to.be.bignumber.equal(ether('1'))
+
+        await contract.disableInterest(dai.address, { from: user }).should.be.rejected
+        await contract.disableInterest(dai.address, { from: owner }).should.be.fulfilled
+
+        expect(await contract.interestImplementation(dai.address)).to.be.equal(ZERO_ADDRESS)
+        expect(await dai.balanceOf(contract.address)).to.be.bignumber.equal(ether('10'))
+      })
+
+      it('configuration', async () => {
+        await contract.initializeInterest(dai.address, daiInterestImpl.address, oneEther)
+
+        await contract.setMinCashThreshold(dai.address, ether('2'), { from: user }).should.be.rejected
+        await contract.setMinCashThreshold(dai.address, ether('2'), { from: owner }).should.be.fulfilled
+        expect(await contract.minCashThreshold(dai.address)).to.be.bignumber.equal(ether('2'))
+
+        await daiInterestImpl.setDust(dai.address, '1', { from: user }).should.be.rejected
+        await daiInterestImpl.setDust(dai.address, '1', { from: owner }).should.be.fulfilled
+        expect((await daiInterestImpl.interestParams(dai.address)).dust).to.be.bignumber.equal('1')
+
+        await daiInterestImpl.setMinInterestPaid(dai.address, oneEther, { from: user }).should.be.rejected
+        await daiInterestImpl.setMinInterestPaid(dai.address, oneEther, { from: owner }).should.be.fulfilled
+        expect((await daiInterestImpl.interestParams(dai.address)).minInterestPaid).to.be.bignumber.equal(oneEther)
+
+        await daiInterestImpl.setInterestReceiver(dai.address, accounts[1], { from: user }).should.be.rejected
+        await daiInterestImpl.setInterestReceiver(dai.address, accounts[1], { from: owner }).should.be.fulfilled
+        expect((await daiInterestImpl.interestParams(dai.address)).interestReceiver).to.be.equal(accounts[1])
+      })
+
+      it('should return invested tokens on withdrawal if needed', async () => {
+        await contract.initializeInterest(dai.address, daiInterestImpl.address, oneEther)
+        await contract.invest(dai.address)
+        expect(await dai.balanceOf(contract.address)).to.be.bignumber.equal(ether('1'))
+        expect(await daiInterestImpl.investedAmount(dai.address)).to.be.bignumber.equal(ether('9'))
+        expect(await contract.mediatorBalance(dai.address)).to.be.bignumber.equal(ether('10'))
+
+        const data1 = contract.contract.methods.handleNativeTokens(dai.address, user, ether('0.5')).encodeABI()
+        expect(await executeMessageCall(exampleMessageId, data1)).to.be.equal(true)
+
+        expect(await dai.balanceOf(contract.address)).to.be.bignumber.equal(ether('0.5'))
+        expect(await contract.mediatorBalance(dai.address)).to.be.bignumber.equal(ether('9.5'))
+        expect(await daiInterestImpl.investedAmount(dai.address)).to.be.bignumber.equal(ether('9'))
+
+        const data2 = contract.contract.methods.handleNativeTokens(dai.address, user, ether('2')).encodeABI()
+        expect(await executeMessageCall(otherMessageId, data2)).to.be.equal(true)
+
+        expect(await dai.balanceOf(contract.address)).to.be.bignumber.equal(ether('1'))
+        expect(await contract.mediatorBalance(dai.address)).to.be.bignumber.equal(ether('7.5'))
+        expect(await daiInterestImpl.investedAmount(dai.address)).to.be.bignumber.equal(ether('6.5'))
+      })
+
+      it('should allow to fix correct amount of tokens when aave is used', async () => {
+        await contract.initializeInterest(dai.address, daiInterestImpl.address, oneEther)
+        await contract.invest(dai.address)
+        expect(await dai.balanceOf(contract.address)).to.be.bignumber.equal(ether('1'))
+        expect(await daiInterestImpl.investedAmount(dai.address)).to.be.bignumber.equal(ether('9'))
+        expect(await contract.mediatorBalance(dai.address)).to.be.bignumber.equal(ether('10'))
+
+        await dai.transfer(contract.address, ether('1'))
+
+        expect(await dai.balanceOf(contract.address)).to.be.bignumber.equal(ether('2'))
+        expect(await daiInterestImpl.investedAmount(dai.address)).to.be.bignumber.equal(ether('9'))
+        expect(await contract.mediatorBalance(dai.address)).to.be.bignumber.equal(ether('10'))
+
+        await contract.fixMediatorBalance(dai.address, owner, { from: owner }).should.be.fulfilled
+
+        expect(await dai.balanceOf(contract.address)).to.be.bignumber.equal(ether('2'))
+        expect(await daiInterestImpl.investedAmount(dai.address)).to.be.bignumber.equal(ether('9'))
+        expect(await contract.mediatorBalance(dai.address)).to.be.bignumber.equal(ether('11'))
+      })
+
+      it('should force disable interest implementation', async () => {
+        await contract.initializeInterest(dai.address, daiInterestImpl.address, oneEther)
+        await contract.invest(dai.address)
+
+        expect(await dai.balanceOf(contract.address)).to.be.bignumber.equal(ether('1'))
+        expect(await daiInterestImpl.investedAmount(dai.address)).to.be.bignumber.equal(ether('9'))
+        expect(await contract.mediatorBalance(dai.address)).to.be.bignumber.equal(ether('10'))
+
+        await daiInterestImpl.forceDisable(dai.address, { from: user }).should.be.rejected
+        await daiInterestImpl.forceDisable(dai.address, { from: owner }).should.be.fulfilled
+
+        expect(await dai.balanceOf(contract.address)).to.be.bignumber.gt(ether('9.999'))
+        expect(await daiInterestImpl.investedAmount(dai.address)).to.be.bignumber.equal(ether('0'))
+        expect(await contract.mediatorBalance(dai.address)).to.be.bignumber.equal(ether('10'))
+      })
+
+      it('should allow to reinitialize when there are no invested funds', async () => {
+        await contract.initializeInterest(dai.address, daiInterestImpl.address, oneEther)
+        await contract.invest(dai.address)
+        await generateInterest()
+
+        await daiInterestImpl.enableInterestToken(dai.address, oneEther, accounts[2], ether('0.01')).should.be.rejected
+
+        await contract.disableInterest(dai.address, { from: owner }).should.be.fulfilled
+
+        await daiInterestImpl.enableInterestToken(dai.address, oneEther, accounts[2], ether('0.01')).should.be.fulfilled
         await contract.initializeInterest(dai.address, daiInterestImpl.address, oneEther)
         await contract.invest(dai.address)
       })
