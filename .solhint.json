@@ -8,6 +8,9 @@
     "reason-string": "off",
     "no-empty-blocks": "off",
     "var-name-mixedcase": "off",
+    "not-rely-on-time": "off",
+    "const-name-snakecase": "off",
+    "func-name-mixedcase": "off",
     "func-visibility": ["warn", { "ignoreConstructors": true } ],
     "compiler-version": ["error", "0.7.5"]
   }

@@ -19,7 +19,7 @@ const { ZERO_ADDRESS } = require('../constants')
 const {
   EternalStorageProxy,
   HomeOmnibridge,
-  PermittableToken,
+  OmnibridgeTokenImage,
   TokenFactory,
   OmnibridgeFeeManager,
   SelectorTokenGasLimitManager,
@@ -40,8 +40,7 @@ async function deployHome() {
     let homeTokenImage = HOME_ERC677_TOKEN_IMAGE
     if (!homeTokenImage) {
       console.log('\n[Home] Deploying new ERC677 token image')
-      const chainId = await web3Home.eth.getChainId()
-      const erc677token = await deployContract(PermittableToken, ['', '', 0, chainId], {
+      const erc677token = await deployContract(OmnibridgeTokenImage, [], {
         nonce: nonce++,
       })
       homeTokenImage = erc677token.options.address

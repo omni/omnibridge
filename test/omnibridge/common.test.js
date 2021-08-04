@@ -8,12 +8,14 @@ const MultiTokenForwardingRulesManager = artifacts.require('MultiTokenForwarding
 const OmnibridgeFeeManager = artifacts.require('OmnibridgeFeeManager')
 const SelectorTokenGasLimitManager = artifacts.require('SelectorTokenGasLimitManager')
 const TokenReceiver = artifacts.require('TokenReceiver')
+const OmnibridgeTokenImage = artifacts.require('OmnibridgeTokenImage')
+const ERC677Mock = artifacts.require('ERC677Mock')
 const CompoundInterestERC20 = artifacts.require('CompoundInterestERC20Mock')
 const AAVEInterestERC20 = artifacts.require('AAVEInterestERC20Mock')
 
 const { expect } = require('chai')
 const { getEvents, ether, expectEventInLogs } = require('../helpers/helpers')
-const { ZERO_ADDRESS, toBN, requirePrecompiled } = require('../setup')
+const { ZERO_ADDRESS, toBN } = require('../setup')
 const getCompoundContracts = require('../compound/contracts')
 const getAAVEContracts = require('../aave/contracts')
 
@@ -47,9 +49,6 @@ function runTests(accounts, isHome) {
   const otherSideMediator = '0x1e33FBB006F47F78704c954555a5c52C2A7f409D'
   const otherSideToken1 = '0xAfb77d544aFc1e2aD3dEEAa20F3c80859E7Fc3C9'
   const otherSideToken2 = '0x876bD892b01D1c9696D873f74cbeF8fc9Bfb1142'
-
-  let ERC677BridgeToken
-  let PermittableToken
 
   let contract
   let token
@@ -133,17 +132,14 @@ function runTests(accounts, isHome) {
   ]
 
   before(async () => {
-    ERC677BridgeToken = await requirePrecompiled('ERC677BridgeToken')
-    PermittableToken = await requirePrecompiled('PermittableToken')
-
-    tokenImage = await PermittableToken.new('TEST', 'TST', 18, 1337)
+    tokenImage = await OmnibridgeTokenImage.new()
     tokenFactory = await TokenFactory.new(owner, tokenImage.address)
   })
 
   beforeEach(async () => {
     contract = await Mediator.new(SUFFIX)
     ambBridgeContract = await AMBMock.new()
-    token = await ERC677BridgeToken.new('TEST', 'TST', 18)
+    token = await ERC677Mock.new('TEST', 'TST', 18)
     currentDay = await contract.getCurrentDay()
     tokenReceiver = await TokenReceiver.new()
   })
@@ -404,7 +400,7 @@ function runTests(accounts, isHome) {
 
       describe('token factory', () => {
         it('should allow to change token image', async () => {
-          const newTokenImage = await PermittableToken.new('Test', 'TST', 18, 1337)
+          const newTokenImage = await OmnibridgeTokenImage.new()
           await tokenFactory.setTokenImage(owner, { from: owner }).should.be.rejected
           await tokenFactory.setTokenImage(newTokenImage.address, { from: user }).should.be.rejected
           await tokenFactory.setTokenImage(newTokenImage.address, { from: owner }).should.be.fulfilled
@@ -627,7 +623,7 @@ function runTests(accounts, isHome) {
             const f1 = toBN(`1${'0'.repeat(decimals)}`)
             const f2 = toBN('1000000000000000000')
 
-            token = await ERC677BridgeToken.new('TEST', 'TST', decimals)
+            token = await ERC677Mock.new('TEST', 'TST', decimals)
             await token.mint(user, value.mul(f1).div(f2)).should.be.fulfilled
             await token.transferAndCall(contract.address, value.mul(f1).div(f2), '0x', { from: user }).should.be
               .fulfilled
@@ -645,7 +641,7 @@ function runTests(accounts, isHome) {
         }
 
         it(`should initialize limits according to decimals = 0`, async () => {
-          token = await ERC677BridgeToken.new('TEST', 'TST', 0)
+          token = await ERC677Mock.new('TEST', 'TST', 0)
           await token.mint(user, '1').should.be.fulfilled
           await token.transferAndCall(contract.address, '1', '0x', { from: user }).should.be.fulfilled
 
@@ -967,7 +963,7 @@ function runTests(accounts, isHome) {
         })
 
         it('should not allow to use unregistered tokens', async () => {
-          const otherToken = await ERC677BridgeToken.new('Test', 'TST', 18)
+          const otherToken = await ERC677Mock.new('Test', 'TST', 18)
           await otherToken.mint(contract.address, value)
           const data = await contract.contract.methods
             .handleNativeTokens(otherToken.address, user, value.toString())
@@ -1032,7 +1028,7 @@ function runTests(accounts, isHome) {
         })
 
         it('should not allow to use unregistered tokens', async () => {
-          const otherToken = await ERC677BridgeToken.new('Test', 'TST', 18)
+          const otherToken = await ERC677Mock.new('Test', 'TST', 18)
           await otherToken.mint(contract.address, value)
           const data = await contract.contract.methods
             .handleNativeTokens(otherToken.address, user, value.toString())
@@ -1123,7 +1119,7 @@ function runTests(accounts, isHome) {
           const args = [otherSideToken1, 'Test', 'TST', 18, user, ether('5')]
           const deployData = contract.contract.methods.deployAndHandleBridgedTokens(...args).encodeABI()
           expect(await executeMessageCall(exampleMessageId, deployData)).to.be.equal(true)
-          token = await PermittableToken.at(await contract.bridgedTokenAddress(otherSideToken1))
+          token = await ERC677Mock.at(await contract.bridgedTokenAddress(otherSideToken1))
         })
 
         for (const send of sendFunctions) {
@@ -1250,7 +1246,7 @@ function runTests(accounts, isHome) {
           expect(events.length).to.be.equal(1)
           const { nativeToken, bridgedToken } = events[0].returnValues
           expect(nativeToken).to.be.equal(otherSideToken1)
-          const deployedToken = await PermittableToken.at(bridgedToken)
+          const deployedToken = await ERC677Mock.at(bridgedToken)
 
           expect(await deployedToken.name()).to.be.equal(modifyName('Test'))
           expect(await deployedToken.symbol()).to.be.equal('TST')
@@ -1295,7 +1291,7 @@ function runTests(accounts, isHome) {
 
           expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
 
-          const deployedToken = await PermittableToken.at(await contract.bridgedTokenAddress(otherSideToken1))
+          const deployedToken = await ERC677Mock.at(await contract.bridgedTokenAddress(otherSideToken1))
           expect(await deployedToken.name()).to.be.equal(modifyName('TST'))
           expect(await deployedToken.symbol()).to.be.equal('TST')
           expect(await deployedToken.decimals()).to.be.bignumber.equal('18')
@@ -1307,7 +1303,7 @@ function runTests(accounts, isHome) {
 
           expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
 
-          const deployedToken = await PermittableToken.at(await contract.bridgedTokenAddress(otherSideToken1))
+          const deployedToken = await ERC677Mock.at(await contract.bridgedTokenAddress(otherSideToken1))
           expect(await deployedToken.name()).to.be.equal(modifyName('Test'))
           expect(await deployedToken.symbol()).to.be.equal('Test')
           expect(await deployedToken.decimals()).to.be.bignumber.equal('18')
@@ -1324,7 +1320,7 @@ function runTests(accounts, isHome) {
             expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
 
             const deployedTokenAddr = await contract.bridgedTokenAddress(otherSideToken1)
-            const deployedToken = await PermittableToken.at(deployedTokenAddr)
+            const deployedToken = await ERC677Mock.at(deployedTokenAddr)
 
             expect(await deployedToken.decimals()).to.be.bignumber.equal(decimals.toString())
 
@@ -1347,7 +1343,7 @@ function runTests(accounts, isHome) {
           expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
 
           const deployedTokenAddr = await contract.bridgedTokenAddress(otherSideToken1)
-          const deployedToken = await PermittableToken.at(deployedTokenAddr)
+          const deployedToken = await ERC677Mock.at(deployedTokenAddr)
 
           expect(await deployedToken.decimals()).to.be.bignumber.equal('0')
           expect(await contract.dailyLimit(deployedTokenAddr)).to.be.bignumber.equal('10000')
@@ -1391,7 +1387,7 @@ function runTests(accounts, isHome) {
           expect(events.length).to.be.equal(1)
           const { nativeToken, bridgedToken } = events[0].returnValues
           expect(nativeToken).to.be.equal(otherSideToken1)
-          const deployedToken = await PermittableToken.at(bridgedToken)
+          const deployedToken = await ERC677Mock.at(bridgedToken)
 
           expect(await deployedToken.name()).to.be.equal(modifyName('Test'))
           expect(await deployedToken.symbol()).to.be.equal('TST')
@@ -1430,7 +1426,7 @@ function runTests(accounts, isHome) {
           expect(events.length).to.be.equal(1)
           const { nativeToken, bridgedToken } = events[0].returnValues
           expect(nativeToken).to.be.equal(otherSideToken1)
-          deployedToken = await PermittableToken.at(bridgedToken)
+          deployedToken = await ERC677Mock.at(bridgedToken)
 
           expect(await contract.totalExecutedPerDay(deployedToken.address, currentDay)).to.be.bignumber.equal(value)
           expect(await deployedToken.balanceOf(user)).to.be.bignumber.equal(value)
@@ -1495,7 +1491,7 @@ function runTests(accounts, isHome) {
           expect(events.length).to.be.equal(1)
           const { nativeToken, bridgedToken } = events[0].returnValues
           expect(nativeToken).to.be.equal(otherSideToken1)
-          deployedToken = await PermittableToken.at(bridgedToken)
+          deployedToken = await ERC677Mock.at(bridgedToken)
 
           expect(await contract.totalExecutedPerDay(deployedToken.address, currentDay)).to.be.bignumber.equal(value)
           expect(await deployedToken.balanceOf(user)).to.be.bignumber.equal(value)
@@ -1657,7 +1653,7 @@ function runTests(accounts, isHome) {
         })
 
         it('should not work for different decimals', async () => {
-          token = await PermittableToken.new('Test', 'TST', 18, 1337)
+          token = await ERC677Mock.new('Test', 'TST', 18)
           await token.transferOwnership(contract.address).should.be.fulfilled
           await contract.setCustomTokenAddressPair(otherSideToken1, token.address).should.be.fulfilled
 
@@ -2019,7 +2015,7 @@ function runTests(accounts, isHome) {
             const deployData = contract.contract.methods.deployAndHandleBridgedTokens(...args).encodeABI()
 
             expect(await executeMessageCall(exampleMessageId, deployData)).to.be.equal(true)
-            const bridgedToken = await PermittableToken.at(await contract.bridgedTokenAddress(otherSideToken1))
+            const bridgedToken = await ERC677Mock.at(await contract.bridgedTokenAddress(otherSideToken1))
 
             let event = await getEvents(contract, { event: 'TokensBridged' })
             expect(event.length).to.be.equal(1)
@@ -2060,7 +2056,7 @@ function runTests(accounts, isHome) {
             const deployData = contract.contract.methods.deployAndHandleBridgedTokens(...args).encodeABI()
 
             expect(await executeMessageCall(exampleMessageId, deployData)).to.be.equal(true)
-            const bridgedToken = await PermittableToken.at(await contract.bridgedTokenAddress(otherSideToken1))
+            const bridgedToken = await ERC677Mock.at(await contract.bridgedTokenAddress(otherSideToken1))
 
             let event = await getEvents(contract, { event: 'TokensBridged' })
             expect(event.length).to.be.equal(1)
@@ -2108,7 +2104,7 @@ function runTests(accounts, isHome) {
             const deployData = contract.contract.methods.deployAndHandleBridgedTokens(...args).encodeABI()
 
             expect(await executeMessageCall(exampleMessageId, deployData)).to.be.equal(true)
-            const bridgedToken = await PermittableToken.at(await contract.bridgedTokenAddress(otherSideToken1))
+            const bridgedToken = await ERC677Mock.at(await contract.bridgedTokenAddress(otherSideToken1))
 
             let event = await getEvents(contract, { event: 'TokensBridged' })
             expect(event.length).to.be.equal(1)
@@ -2150,7 +2146,7 @@ function runTests(accounts, isHome) {
 
             expect(await executeMessageCall(exampleMessageId, deployData)).to.be.equal(true)
             expect(await executeMessageCall(exampleMessageId, deployData)).to.be.equal(true)
-            token = await PermittableToken.at(await contract.bridgedTokenAddress(otherSideToken1))
+            token = await ERC677Mock.at(await contract.bridgedTokenAddress(otherSideToken1))
           })
 
           testHomeToForeignFee(false)
@@ -2230,7 +2226,7 @@ function runTests(accounts, isHome) {
         const args = [otherSideToken1, 'Test', 'TST', 18, user, value]
         const data = contract.contract.methods.deployAndHandleBridgedTokens(...args).encodeABI()
         expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
-        const bridgedToken = await PermittableToken.at(await contract.bridgedTokenAddress(otherSideToken1))
+        const bridgedToken = await ERC677Mock.at(await contract.bridgedTokenAddress(otherSideToken1))
 
         await token.transferAndCall(contract.address, ether('0.1'), '0x', { from: user }).should.be.fulfilled
         await bridgedToken.transferAndCall(contract.address, ether('0.1'), '0x', { from: user }).should.be.fulfilled

@@ -123,7 +123,6 @@ contract TokensBridgeLimits is EternalStorage, Ownable {
      * @return day number.
      */
     function getCurrentDay() public view returns (uint256) {
-        // solhint-disable-next-line not-rely-on-time
         return block.timestamp / 1 days;
     }
 

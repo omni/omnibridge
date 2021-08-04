@@ -13,6 +13,7 @@ import "./components/common/TokensBridgeLimits.sol";
 import "./components/common/FailedMessagesProcessor.sol";
 import "./modules/factory/TokenFactoryConnector.sol";
 import "../interfaces/IBurnableMintableERC677Token.sol";
+import "../interfaces/IClaimable.sol";
 import "../interfaces/IERC20Metadata.sol";
 import "../interfaces/IERC20Receiver.sol";
 import "../libraries/TokenReader.sol";
@@ -286,7 +287,7 @@ abstract contract BasicOmnibridge is
         address _token,
         address _to
     ) external onlyIfUpgradeabilityOwner {
-        IBurnableMintableERC677Token(_bridgedToken).claimTokens(_token, _to);
+        IClaimable(_bridgedToken).claimTokens(_token, _to);
     }
 
     /**
@@ -444,7 +445,7 @@ abstract contract BasicOmnibridge is
                 symbol = name;
             }
             name = _transformName(name);
-            bridgedToken = tokenFactory().deploy(name, symbol, _decimals, bridgeContract().sourceChainId());
+            bridgedToken = tokenFactory().deploy(name, symbol, _decimals);
             _setTokenAddressPair(_token, bridgedToken);
             _initializeTokenBridgeLimits(bridgedToken, _decimals);
         } else if (!isTokenRegistered(bridgedToken)) {

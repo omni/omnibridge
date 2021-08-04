@@ -22,7 +22,7 @@ const CTokenABI = require('../build/contracts/ICToken.json').abi
 
 const WETHOmnibridgeRouterABI = [...WETHOmnibridgeRouter.abi, ...AMBEventABI]
 
-const ERC677 = require('../precompiled/ERC677BridgeToken.json')
+const ERC677 = require('../build/contracts/ERC677Mock.json')
 const TokenReceiver = require('../build/contracts/TokenReceiver.json')
 
 const scenarios = [

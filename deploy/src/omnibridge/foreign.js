@@ -1,6 +1,6 @@
 const { web3Foreign, deploymentAddress } = require('../web3')
 const { deployContract, upgradeProxy } = require('../deploymentUtils')
-const { EternalStorageProxy, ForeignOmnibridge, PermittableToken, TokenFactory } = require('../loadContracts')
+const { EternalStorageProxy, ForeignOmnibridge, OmnibridgeTokenImage, TokenFactory } = require('../loadContracts')
 const {
   FOREIGN_TOKEN_FACTORY,
   FOREIGN_ERC677_TOKEN_IMAGE,
@@ -23,8 +23,7 @@ async function deployForeign() {
     let foreignTokenImage = FOREIGN_ERC677_TOKEN_IMAGE
     if (!foreignTokenImage) {
       console.log('\n[Foreign] Deploying new ERC677 token image')
-      const chainId = await web3Foreign.eth.getChainId()
-      const erc677token = await deployContract(PermittableToken, ['', '', 0, chainId], {
+      const erc677token = await deployContract(OmnibridgeTokenImage, [], {
         network: 'foreign',
         nonce: nonce++,
       })

@@ -3,10 +3,11 @@ const AMBMock = artifacts.require('AMBMock')
 const TokenFactory = artifacts.require('TokenFactory')
 const WETHOmnibridgeRouter = artifacts.require('WETHOmnibridgeRouter')
 const WETH = artifacts.require('WETH')
+const OmnibridgeTokenImage = artifacts.require('OmnibridgeTokenImage')
 
 const { expect } = require('chai')
 const { getEvents, ether } = require('../helpers/helpers')
-const { toBN, requirePrecompiled } = require('../setup')
+const { toBN } = require('../setup')
 
 const oneEther = ether('1')
 const dailyLimit = ether('2.5')
@@ -23,9 +24,7 @@ contract('WETHOmnibridgeRouter', (accounts) => {
   const user = accounts[1]
 
   beforeEach(async () => {
-    const PermittableToken = await requirePrecompiled('PermittableToken')
-
-    const tokenImage = await PermittableToken.new('TEST', 'TST', 18, 1337)
+    const tokenImage = await OmnibridgeTokenImage.new()
     const tokenFactory = await TokenFactory.new(owner, tokenImage.address)
     mediator = await ForeignOmnibridge.new(' on Testnet')
     ambBridgeContract = await AMBMock.new()

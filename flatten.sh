@@ -24,7 +24,7 @@ ${FLATTENER} ${BRIDGE_CONTRACTS_DIR}/modules/interest/CompoundInterestERC20.sol 
 ${FLATTENER} ${BRIDGE_CONTRACTS_DIR}/modules/interest/AAVEInterestERC20.sol > flats/AAVEInterestERC20_flat.sol
 
 echo "Flattening token contracts"
-cp ./precompiled/PermittableToken_flat.sol flats
+${FLATTENER} contracts/tokens/OmnibridgeTokenImage.sol > flats/OmnibridgeTokenImage_flat.sol
 
 for file in flats/*.sol; do
   grep -v SPDX "$file" > tmp; mv tmp "$file"
