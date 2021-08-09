@@ -10,7 +10,6 @@ const SelectorTokenGasLimitManager = artifacts.require('SelectorTokenGasLimitMan
 const TokenReceiver = artifacts.require('TokenReceiver')
 const CompoundInterestERC20 = artifacts.require('CompoundInterestERC20Mock')
 const AAVEInterestERC20 = artifacts.require('AAVEInterestERC20Mock')
-const TokenProxy = artifacts.require('TokenProxy')
 
 const { expect } = require('chai')
 const { getEvents, ether, expectEventInLogs } = require('../helpers/helpers')
@@ -1668,37 +1667,6 @@ function runTests(accounts, isHome) {
           const data2 = contract.contract.methods.deployAndHandleBridgedTokens(...deployArgs2).encodeABI()
           expect(await executeMessageCall(exampleMessageId, data1)).to.be.equal(false)
           expect(await executeMessageCall(otherMessageId, data2)).to.be.equal(true)
-        })
-      })
-
-      describe('set new implementation', () => {
-        let deployedToken
-        let deployedProxy
-        beforeEach(async () => {
-          const args = [otherSideToken1, 'Test', 'TST', 18, user, value]
-          const data = contract.contract.methods.deployAndHandleBridgedTokens(...args).encodeABI()
-
-          expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
-
-          const events = await getEvents(contract, { event: 'NewTokenRegistered' })
-          expect(events.length).to.be.equal(1)
-          const { nativeToken, bridgedToken } = events[0].returnValues
-          expect(nativeToken).to.be.equal(otherSideToken1)
-          deployedProxy = await TokenProxy.at(bridgedToken)
-          deployedToken = await PermittableToken.at(bridgedToken)
-        })
-
-        it('allow bridge owner to update implementation', async () => {
-          expect(await deployedProxy.implementation()).to.be.equal(await tokenFactory.tokenImage())
-          expect(await deployedToken.name()).to.be.equal(modifyName('Test'))
-
-          const newTokenImage = await PermittableToken.new('Test', 'TST', 18, 1337)
-          await deployedProxy.setImplementation(newTokenImage.address, { from: user }).should.be.rejected
-          await deployedProxy.setImplementation(ZERO_ADDRESS, { from: owner }).should.be.rejected
-          await deployedProxy.setImplementation(newTokenImage.address, { from: owner }).should.be.fulfilled
-
-          expect(await deployedProxy.implementation()).to.be.equal(newTokenImage.address)
-          expect(await deployedToken.name()).to.be.equal(modifyName('Test'))
         })
       })
     })

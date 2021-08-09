@@ -1,8 +1,6 @@
 pragma solidity 0.7.5;
 
-import "@openzeppelin/contracts/utils/Address.sol";
 import "../../../upgradeability/Proxy.sol";
-import "../../../interfaces/IOwnable.sol";
 
 interface IPermittableTokenVersion {
     function version() external pure returns (string memory);
@@ -80,21 +78,6 @@ contract TokenProxy is Proxy {
     }
 
     /**
-     * @dev Updates the implementation contract address.
-     * Only the bridge and bridge owner can call this method.
-     * @param _implementation address of the new implementation.
-     */
-    function setImplementation(address _implementation) external {
-        require(msg.sender == bridgeContractAddr || msg.sender == IOwnable(bridgeContractAddr).owner());
-        require(Address.isContract(_implementation));
-        assembly {
-            // EIP 1967
-            // bytes32(uint256(keccak256('eip1967.proxy.implementation')) - 1)
-            sstore(0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc, _implementation)
-        }
-    }
-
-    /**
      * @dev Tells the current version of the token proxy interfaces.
      */
     function getTokenProxyInterfacesVersion()
@@ -106,6 +89,6 @@ contract TokenProxy is Proxy {
             uint64 patch
         )
     {
-        return (1, 1, 0);
+        return (1, 0, 0);
     }
 }
