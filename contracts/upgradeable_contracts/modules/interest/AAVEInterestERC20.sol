@@ -4,19 +4,17 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../../../interfaces/IAToken.sol";
 import "../../../interfaces/IOwnable.sol";
-import "../../../interfaces/IInterestReceiver.sol";
-import "../../../interfaces/IInterestImplementation.sol";
 import "../../../interfaces/ILendingPool.sol";
 import "../MediatorOwnableModule.sol";
+import "./BaseInterestERC20.sol";
 
 /**
  * @title AAVEInterestERC20
  * @dev This contract contains token-specific logic for investing ERC20 tokens into AAVE protocol.
  */
-contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
+contract AAVEInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
     using SafeMath for uint256;
 
-    event PaidInterest(address indexed token, address to, uint256 value);
     event ForceDisable(address token, uint256 tokensAmount, uint256 aTokensAmount, uint256 investedAmount);
 
     struct InterestParams {
@@ -146,7 +144,7 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
      * Earned interest is withdrawn and transferred to the specified interest receiver account.
      * @param _token address of the invested token contract in which interest should be paid.
      */
-    function payInterest(address _token) external {
+    function payInterest(address _token) external onlyEOA {
         InterestParams storage params = interestParams[_token];
         uint256 interest = interestAmount(_token);
         require(interest >= params.minInterestPaid);
@@ -230,28 +228,5 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
         require(redeemed >= _amount);
 
         return redeemed;
-    }
-
-    /**
-     * @dev Internal function transferring interest tokens to the interest receiver.
-     * Calls a callback on the receiver, interest receiver is a contract.
-     * @param _receiver address of the tokens receiver.
-     * @param _token address of the token contract to send.
-     * @param _amount amount of tokens to transfer.
-     */
-    function _transferInterest(
-        address _receiver,
-        address _token,
-        uint256 _amount
-    ) internal {
-        require(_receiver != address(0));
-
-        IERC20(_token).transfer(_receiver, _amount);
-
-        if (Address.isContract(_receiver)) {
-            IInterestReceiver(_receiver).onInterestReceived(_token);
-        }
-
-        emit PaidInterest(_token, _receiver, _amount);
     }
 }
