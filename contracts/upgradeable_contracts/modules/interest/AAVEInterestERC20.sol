@@ -163,11 +163,10 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
         InterestParams storage params = interestParams[_token];
         IAToken aToken = params.aToken;
 
-        uint256 aTokenBalance = aToken.balanceOf(address(this));
+        uint256 aTokenBalance = 0;
         // try to redeem all aTokens
-        try lendingPool().withdraw(_token, aTokenBalance, mediator) {
-            aTokenBalance = 0;
-        } catch {
+        try lendingPool().withdraw(_token, uint256(-1), mediator) {} catch {
+            aTokenBalance = aToken.balanceOf(address(this));
             aToken.transfer(mediator, aTokenBalance);
         }
 
