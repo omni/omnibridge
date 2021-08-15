@@ -157,7 +157,10 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager, InterestConnecto
             }
 
             IInterestImplementation impl = interestImplementation(_token);
-            if (Address.isContract(address(impl))) {
+            // can be used instead of Address.isContract(address(impl)),
+            // since _setInterestImplementation guarantees that impl is either a contract or zero address
+            // and interest implementation does not contain any selfdestruct opcode
+            if (address(impl) != address(0)) {
                 uint256 availableBalance = balance.sub(impl.investedAmount(_token));
                 if (_value > availableBalance) {
                     impl.withdraw(_token, (_value - availableBalance).add(minCashThreshold(_token)));
