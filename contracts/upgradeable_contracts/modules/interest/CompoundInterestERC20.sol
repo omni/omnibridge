@@ -217,11 +217,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
 
         emit ForceDisable(_token, balance, cTokenBalance, params.investedAmount);
 
-        delete params.cToken;
-        delete params.dust;
-        delete params.investedAmount;
-        delete params.minInterestPaid;
-        delete params.interestReceiver;
+        delete interestParams[_token];
     }
 
     /**

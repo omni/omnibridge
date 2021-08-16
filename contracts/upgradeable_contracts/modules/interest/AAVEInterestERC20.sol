@@ -176,11 +176,7 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
 
         emit ForceDisable(_token, balance, aTokenBalance, params.investedAmount);
 
-        delete params.aToken;
-        delete params.dust;
-        delete params.investedAmount;
-        delete params.minInterestPaid;
-        delete params.interestReceiver;
+        delete interestParams[_token];
     }
 
     /**
