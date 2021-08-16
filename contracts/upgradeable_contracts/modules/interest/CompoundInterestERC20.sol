@@ -5,15 +5,14 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../../../interfaces/ICToken.sol";
 import "../../../interfaces/IComptroller.sol";
 import "../../../interfaces/IOwnable.sol";
-import "../../../interfaces/IInterestReceiver.sol";
-import "../../../interfaces/IInterestImplementation.sol";
 import "../MediatorOwnableModule.sol";
+import "./BaseInterestERC20.sol";
 
 /**
  * @title CompoundInterestERC20
  * @dev This contract contains token-specific logic for investing ERC20 tokens into Compound protocol.
  */
-contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule {
+contract CompoundInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
     using SafeMath for uint256;
 
     uint256 internal constant SUCCESS = 0;
@@ -165,7 +164,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      * Earned interest is withdrawn and transferred to the specified interest receiver account.
      * @param _token address of the invested token contract in which interest should be paid.
      */
-    function payInterest(address _token) external {
+    function payInterest(address _token) external onlyEOA {
         InterestParams storage params = interestParams[_token];
         uint256 interest = interestAmount(_token);
         require(interest >= params.minInterestPaid);
@@ -189,7 +188,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      * @dev Claims Comp token received by supplying underlying tokens and transfers it to the associated COMP receiver.
      * @param _markets cTokens addresses to claim COMP for.
      */
-    function claimCompAndPay(address[] calldata _markets) external {
+    function claimCompAndPay(address[] calldata _markets) external onlyEOA {
         uint256 balance = compAmount(_markets);
         require(balance >= minCompPaid);
         _transferInterest(compReceiver, address(compToken()), balance);
@@ -294,28 +293,5 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
         require(redeemed >= _amount);
 
         return redeemed;
-    }
-
-    /**
-     * @dev Internal function transferring interest tokens to the interest receiver.
-     * Calls a callback on the receiver, interest receiver is a contract.
-     * @param _receiver address of the tokens receiver.
-     * @param _token address of the token contract to send.
-     * @param _amount amount of tokens to transfer.
-     */
-    function _transferInterest(
-        address _receiver,
-        address _token,
-        uint256 _amount
-    ) internal {
-        require(_receiver != address(0));
-
-        IERC20(_token).transfer(_receiver, _amount);
-
-        if (Address.isContract(_receiver)) {
-            IInterestReceiver(_receiver).onInterestReceived(_token);
-        }
-
-        emit PaidInterest(_token, _receiver, _amount);
     }
 }
