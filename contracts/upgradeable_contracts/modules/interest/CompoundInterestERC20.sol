@@ -65,7 +65,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      * @dev Enables support for interest earning through specific cToken.
      * @param _cToken address of the cToken contract. Underlying token address is derived from this contract.
      * @param _dust small amount of underlying tokens that cannot be paid as an interest. Accounts for possible truncation errors.
-     * @param _interestReceiver address of the interest receiver for underlying token and associated COMP tokens.
+     * @param _interestReceiver address of the interest receiver for underlying token.
      * @param _minInterestPaid min amount of underlying tokens to be paid as an interest.
      */
     function enableInterestToken(
@@ -129,7 +129,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
     }
 
     /**
-     * @dev Withdraws at least the given amount of tokens from the Compound protocol.
+     * @dev Withdraws at least min(_amount, investedAmount) of tokens from the Compound protocol.
      * Only Omnibridge contract is allowed to call this method.
      * Converts X cTOKENs into _amount of TOKENs.
      * @param _token address of the invested token contract.
