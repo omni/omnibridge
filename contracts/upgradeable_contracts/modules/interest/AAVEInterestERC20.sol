@@ -16,9 +16,6 @@ import "../MediatorOwnableModule.sol";
 contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
     using SafeMath for uint256;
 
-    event PaidInterest(address indexed token, address to, uint256 value);
-    event ForceDisable(address token, uint256 tokensAmount, uint256 aTokensAmount, uint256 investedAmount);
-
     struct InterestParams {
         IAToken aToken;
         uint96 dust;
@@ -78,6 +75,11 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
         interestParams[_token] = InterestParams(aToken, _dust, 0, _interestReceiver, _minInterestPaid);
 
         IERC20(_token).approve(address(lendingPool()), uint256(-1));
+
+        emit InterestEnabled(_token, address(aToken));
+        emit InterestDustUpdated(_token, _dust);
+        emit InterestReceiverUpdated(_token, _interestReceiver);
+        emit MinInterestPaidUpdated(_token, _minInterestPaid);
     }
 
     /**
@@ -173,6 +175,7 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
 
         uint256 balance = IERC20(_token).balanceOf(address(this));
         IERC20(_token).transfer(mediator, balance);
+        IERC20(_token).approve(address(lendingPool()), 0);
 
         emit ForceDisable(_token, balance, aTokenBalance, params.investedAmount);
 
@@ -191,6 +194,7 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
      */
     function setDust(address _token, uint96 _dust) external onlyOwner {
         interestParams[_token].dust = _dust;
+        emit InterestDustUpdated(_token, _dust);
     }
 
     /**
@@ -202,6 +206,7 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
      */
     function setInterestReceiver(address _token, address _receiver) external onlyOwner {
         interestParams[_token].interestReceiver = _receiver;
+        emit InterestReceiverUpdated(_token, _receiver);
     }
 
     /**
@@ -212,6 +217,7 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
      */
     function setMinInterestPaid(address _token, uint256 _minInterestPaid) external onlyOwner {
         interestParams[_token].minInterestPaid = _minInterestPaid;
+        emit MinInterestPaidUpdated(_token, _minInterestPaid);
     }
 
     /**
