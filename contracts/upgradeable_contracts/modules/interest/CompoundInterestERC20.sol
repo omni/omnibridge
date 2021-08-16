@@ -15,8 +15,6 @@ import "./BaseInterestERC20.sol";
 contract CompoundInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
     using SafeMath for uint256;
 
-    event ForceDisable(address token, uint256 tokensAmount, uint256 cTokensAmount, uint256 investedAmount);
-
     uint256 internal constant SUCCESS = 0;
 
     struct InterestParams {
@@ -63,7 +61,7 @@ contract CompoundInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
      * @dev Enables support for interest earning through specific cToken.
      * @param _cToken address of the cToken contract. Underlying token address is derived from this contract.
      * @param _dust small amount of underlying tokens that cannot be paid as an interest. Accounts for possible truncation errors.
-     * @param _interestReceiver address of the interest receiver for underlying token and associated COMP tokens.
+     * @param _interestReceiver address of the interest receiver for underlying token.
      * @param _minInterestPaid min amount of underlying tokens to be paid as an interest.
      */
     function enableInterestToken(
@@ -79,6 +77,11 @@ contract CompoundInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
         interestParams[token] = InterestParams(_cToken, _dust, 0, _interestReceiver, _minInterestPaid);
 
         IERC20(token).approve(address(_cToken), uint256(-1));
+
+        emit InterestEnabled(token, address(_cToken));
+        emit InterestDustUpdated(token, _dust);
+        emit InterestReceiverUpdated(token, _interestReceiver);
+        emit MinInterestPaidUpdated(token, _minInterestPaid);
     }
 
     /**
@@ -127,7 +130,7 @@ contract CompoundInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
     }
 
     /**
-     * @dev Withdraws at least the given amount of tokens from the Compound protocol.
+     * @dev Withdraws at least min(_amount, investedAmount) of tokens from the Compound protocol.
      * Only Omnibridge contract is allowed to call this method.
      * Converts X cTOKENs into _amount of TOKENs.
      * @param _token address of the invested token contract.
@@ -212,14 +215,11 @@ contract CompoundInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
 
         uint256 balance = IERC20(_token).balanceOf(address(this));
         IERC20(_token).transfer(mediator, balance);
+        IERC20(_token).approve(address(cToken), 0);
 
         emit ForceDisable(_token, balance, cTokenBalance, params.investedAmount);
 
-        delete params.cToken;
-        delete params.dust;
-        delete params.investedAmount;
-        delete params.minInterestPaid;
-        delete params.interestReceiver;
+        delete interestParams[_token];
     }
 
     /**
@@ -230,6 +230,7 @@ contract CompoundInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
      */
     function setDust(address _token, uint96 _dust) external onlyOwner {
         interestParams[_token].dust = _dust;
+        emit InterestDustUpdated(_token, _dust);
     }
 
     /**
@@ -241,6 +242,7 @@ contract CompoundInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
      */
     function setInterestReceiver(address _token, address _receiver) external onlyOwner {
         interestParams[_token].interestReceiver = _receiver;
+        emit InterestReceiverUpdated(_token, _receiver);
     }
 
     /**
@@ -251,6 +253,7 @@ contract CompoundInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
      */
     function setMinInterestPaid(address _token, uint256 _minInterestPaid) external onlyOwner {
         interestParams[_token].minInterestPaid = _minInterestPaid;
+        emit MinInterestPaidUpdated(_token, _minInterestPaid);
     }
 
     /**
@@ -260,6 +263,7 @@ contract CompoundInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
      */
     function setMinCompPaid(uint256 _minCompPaid) external onlyOwner {
         minCompPaid = _minCompPaid;
+        emit MinInterestPaidUpdated(address(compToken()), _minCompPaid);
     }
 
     /**
@@ -270,6 +274,7 @@ contract CompoundInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
      */
     function setCompReceiver(address _receiver) external onlyOwner {
         compReceiver = _receiver;
+        emit InterestReceiverUpdated(address(compToken()), _receiver);
     }
 
     /**

@@ -10,8 +10,6 @@ import "../../../interfaces/IInterestImplementation.sol";
  * @dev This contract contains common logic for investing ERC20 tokens into different interest-earning protocols.
  */
 abstract contract BaseInterestERC20 is IInterestImplementation {
-    event PaidInterest(address indexed token, address to, uint256 value);
-
     /**
      * @dev Ensures that caller is an EOA.
      * Functions with such modifier cannot be called from other contract (as well as from GSN-like approaches)
