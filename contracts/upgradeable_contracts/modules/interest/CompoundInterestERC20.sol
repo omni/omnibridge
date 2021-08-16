@@ -16,9 +16,6 @@ import "../MediatorOwnableModule.sol";
 contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule {
     using SafeMath for uint256;
 
-    event PaidInterest(address indexed token, address to, uint256 value);
-    event ForceDisable(address token, uint256 tokensAmount, uint256 cTokensAmount, uint256 investedAmount);
-
     uint256 internal constant SUCCESS = 0;
 
     struct InterestParams {
@@ -81,6 +78,11 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
         interestParams[token] = InterestParams(_cToken, _dust, 0, _interestReceiver, _minInterestPaid);
 
         IERC20(token).approve(address(_cToken), uint256(-1));
+
+        emit InterestEnabled(token, address(_cToken));
+        emit InterestDustUpdated(token, _dust);
+        emit InterestReceiverUpdated(token, _interestReceiver);
+        emit MinInterestPaidUpdated(token, _minInterestPaid);
     }
 
     /**
@@ -214,6 +216,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
 
         uint256 balance = IERC20(_token).balanceOf(address(this));
         IERC20(_token).transfer(mediator, balance);
+        IERC20(_token).approve(address(cToken), 0);
 
         emit ForceDisable(_token, balance, cTokenBalance, params.investedAmount);
 
@@ -228,6 +231,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      */
     function setDust(address _token, uint96 _dust) external onlyOwner {
         interestParams[_token].dust = _dust;
+        emit InterestDustUpdated(_token, _dust);
     }
 
     /**
@@ -239,6 +243,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      */
     function setInterestReceiver(address _token, address _receiver) external onlyOwner {
         interestParams[_token].interestReceiver = _receiver;
+        emit InterestReceiverUpdated(_token, _receiver);
     }
 
     /**
@@ -249,6 +254,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      */
     function setMinInterestPaid(address _token, uint256 _minInterestPaid) external onlyOwner {
         interestParams[_token].minInterestPaid = _minInterestPaid;
+        emit MinInterestPaidUpdated(_token, _minInterestPaid);
     }
 
     /**
@@ -258,6 +264,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      */
     function setMinCompPaid(uint256 _minCompPaid) external onlyOwner {
         minCompPaid = _minCompPaid;
+        emit MinInterestPaidUpdated(address(compToken()), _minCompPaid);
     }
 
     /**
@@ -268,6 +275,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      */
     function setCompReceiver(address _receiver) external onlyOwner {
         compReceiver = _receiver;
+        emit InterestReceiverUpdated(address(compToken()), _receiver);
     }
 
     /**
