@@ -14,6 +14,8 @@ import "./BaseInterestERC20.sol";
  */
 contract AAVEInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
     using SafeMath for uint256;
+    using SafeERC20 for IERC20;
+    using SafeERC20 for IAToken;
 
     struct InterestParams {
         IAToken aToken;
@@ -124,7 +126,7 @@ contract AAVEInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
         uint256 invested = params.investedAmount;
         uint256 redeemed = _safeWithdraw(_token, _amount > invested ? invested : _amount);
         params.investedAmount = redeemed > invested ? 0 : invested - redeemed;
-        IERC20(_token).transfer(mediator, redeemed);
+        IERC20(_token).safeTransfer(mediator, redeemed);
     }
 
     /**
@@ -170,11 +172,11 @@ contract AAVEInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
         // since the withdraw method of the pool contract will return the entire balance
         try lendingPool().withdraw(_token, uint256(-1), mediator) {} catch {
             aTokenBalance = aToken.balanceOf(address(this));
-            aToken.transfer(mediator, aTokenBalance);
+            aToken.safeTransfer(mediator, aTokenBalance);
         }
 
         uint256 balance = IERC20(_token).balanceOf(address(this));
-        IERC20(_token).transfer(mediator, balance);
+        IERC20(_token).safeTransfer(mediator, balance);
         IERC20(_token).approve(address(lendingPool()), 0);
 
         emit ForceDisable(_token, balance, aTokenBalance, params.investedAmount);
