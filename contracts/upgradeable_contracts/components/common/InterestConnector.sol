@@ -1,6 +1,7 @@
 pragma solidity 0.7.5;
 
 import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../../Ownable.sol";
 import "../../../interfaces/IInterestReceiver.sol";
@@ -13,6 +14,7 @@ import "../native/MediatorBalanceStorage.sol";
  */
 contract InterestConnector is Ownable, MediatorBalanceStorage {
     using SafeMath for uint256;
+    using SafeERC20 for IERC20;
 
     /**
      * @dev Tells address of the interest earning implementation for the specific token contract.
@@ -86,7 +88,7 @@ contract InterestConnector is Ownable, MediatorBalanceStorage {
         require(balance > minCash);
         uint256 amount = balance - minCash;
 
-        IERC20(_token).transfer(address(impl), amount);
+        IERC20(_token).safeTransfer(address(impl), amount);
         impl.invest(_token, amount);
     }
 

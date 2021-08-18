@@ -1,6 +1,7 @@
 pragma solidity 0.7.5;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "../../../interfaces/IInterestReceiver.sol";
 import "../../../interfaces/IInterestImplementation.sol";
@@ -10,6 +11,8 @@ import "../../../interfaces/IInterestImplementation.sol";
  * @dev This contract contains common logic for investing ERC20 tokens into different interest-earning protocols.
  */
 abstract contract BaseInterestERC20 is IInterestImplementation {
+    using SafeERC20 for IERC20;
+
     /**
      * @dev Ensures that caller is an EOA.
      * Functions with such modifier cannot be called from other contract (as well as from GSN-like approaches)
@@ -35,7 +38,7 @@ abstract contract BaseInterestERC20 is IInterestImplementation {
     ) internal {
         require(_receiver != address(0));
 
-        IERC20(_token).transfer(_receiver, _amount);
+        IERC20(_token).safeTransfer(_receiver, _amount);
 
         if (Address.isContract(_receiver)) {
             IInterestReceiver(_receiver).onInterestReceived(_token);
