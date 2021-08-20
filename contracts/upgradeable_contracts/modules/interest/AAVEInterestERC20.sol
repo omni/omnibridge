@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../../../interfaces/IAToken.sol";
 import "../../../interfaces/IOwnable.sol";
 import "../../../interfaces/ILendingPool.sol";
+import "../../../interfaces/IStakedTokenIncentivesController.sol";
 import "../MediatorOwnableModule.sol";
 import "./BaseInterestERC20.sol";
 
@@ -26,8 +27,18 @@ contract AAVEInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
     }
 
     mapping(address => InterestParams) public interestParams;
+    uint256 public minAavePaid;
+    address public aaveReceiver;
 
-    constructor(address _omnibridge, address _owner) MediatorOwnableModule(_omnibridge, _owner) {}
+    constructor(
+        address _omnibridge,
+        address _owner,
+        uint256 _minAavePaid,
+        address _aaveReceiver
+    ) MediatorOwnableModule(_omnibridge, _owner) {
+        minAavePaid = _minAavePaid;
+        aaveReceiver = _aaveReceiver;
+    }
 
     /**
      * @dev Tells the module interface version that this contract supports.
@@ -52,6 +63,20 @@ contract AAVEInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
      */
     function lendingPool() public pure virtual returns (ILendingPool) {
         return ILendingPool(0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9);
+    }
+
+    /**
+     * @dev Tells the address of the StakedTokenIncentivesController contract in the Ethereum Mainnet.
+     */
+    function incentivesController() public pure virtual returns (IStakedTokenIncentivesController) {
+        return IStakedTokenIncentivesController(0xd784927Ff2f95ba542BfC824c8a8a98F3495f6b5);
+    }
+
+    /**
+     * @dev Tells the address of the StkAAVE token contract in the Ethereum Mainnet.
+     */
+    function stkAAVEToken() public pure virtual returns (address) {
+        return 0x4da27a545c0c5B758a6BA100e3a049001de870f5;
     }
 
     /**
@@ -157,6 +182,29 @@ contract AAVEInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
     }
 
     /**
+     * @dev Tells the amount of earned stkAAVE tokens for supplying assets into the protocol that can be withdrawn.
+     * Intended to be called via eth_call to obtain the current accumulated value for stkAAVE.
+     * @param _assets aTokens addresses to claim stkAAVE for.
+     * @return amount of accumulated stkAAVE tokens across given markets.
+     */
+    function aaveAmount(address[] calldata _assets) public view returns (uint256) {
+        return incentivesController().getRewardsBalance(_assets, address(this));
+    }
+
+    /**
+     * @dev Claims stkAAVE token received by supplying underlying tokens and transfers it to the associated AAVE receiver.
+     * @param _assets aTokens addresses to claim stkAAVE for.
+     */
+    function claimAaveAndPay(address[] calldata _assets) external {
+        uint256 balance = aaveAmount(_assets);
+        require(balance >= minAavePaid);
+
+        incentivesController().claimRewards(_assets, balance, address(this));
+
+        _transferInterest(aaveReceiver, stkAAVEToken(), balance);
+    }
+
+    /**
      * @dev Last-resort function for returning assets to the Omnibridge contract in case of some failures in the logic.
      * Disables this contract and transfers locked tokens back to the mediator.
      * Only owner is allowed to call this method.
@@ -216,6 +264,27 @@ contract AAVEInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
     function setMinInterestPaid(address _token, uint256 _minInterestPaid) external onlyOwner {
         interestParams[_token].minInterestPaid = _minInterestPaid;
         emit MinInterestPaidUpdated(_token, _minInterestPaid);
+    }
+
+    /**
+     * @dev Updates min stkAAVE amount that can be transferred in single call.
+     * Only owner is allowed to call this method.
+     * @param _minAavePaid new amount of stkAAVE and can be transferred to the interest receiver in single operation.
+     */
+    function setMinAavePaid(uint256 _minAavePaid) external onlyOwner {
+        minAavePaid = _minAavePaid;
+        emit MinInterestPaidUpdated(address(stkAAVEToken()), _minAavePaid);
+    }
+
+    /**
+     * @dev Updates address of the accumulated stkAAVE receiver. Can be any address, EOA or contract.
+     * Set to 0x00..00 to disable stkAAVE claims and transfers.
+     * Only owner is allowed to call this method.
+     * @param _receiver address of the interest receiver.
+     */
+    function setAaveReceiver(address _receiver) external onlyOwner {
+        aaveReceiver = _receiver;
+        emit InterestReceiverUpdated(address(stkAAVEToken()), _receiver);
     }
 
     /**
