@@ -6,6 +6,7 @@ import "../../../interfaces/IAToken.sol";
 import "../../../interfaces/IOwnable.sol";
 import "../../../interfaces/ILendingPool.sol";
 import "../../../interfaces/IStakedTokenIncentivesController.sol";
+import "../../../interfaces/ILegacyERC20.sol";
 import "../MediatorOwnableModule.sol";
 import "./BaseInterestERC20.sol";
 
@@ -100,7 +101,9 @@ contract AAVEInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
 
         interestParams[_token] = InterestParams(aToken, _dust, 0, _interestReceiver, _minInterestPaid);
 
-        IERC20(_token).approve(address(lendingPool()), uint256(-1));
+        // SafeERC20.safeApprove does not work here in case of possible interest reinitialization,
+        // since it does not allow positive->positive allowance change. However, it would be safe to make such change here.
+        ILegacyERC20(_token).approve(address(lendingPool()), uint256(-1));
 
         emit InterestEnabled(_token, address(aToken));
         emit InterestDustUpdated(_token, _dust);
@@ -195,7 +198,7 @@ contract AAVEInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
      * @dev Claims stkAAVE token received by supplying underlying tokens and transfers it to the associated AAVE receiver.
      * @param _assets aTokens addresses to claim stkAAVE for.
      */
-    function claimAaveAndPay(address[] calldata _assets) external {
+    function claimAaveAndPay(address[] calldata _assets) external onlyEOA {
         uint256 balance = aaveAmount(_assets);
         require(balance >= minAavePaid);
 
@@ -225,7 +228,7 @@ contract AAVEInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
 
         uint256 balance = IERC20(_token).balanceOf(address(this));
         IERC20(_token).safeTransfer(mediator, balance);
-        IERC20(_token).approve(address(lendingPool()), 0);
+        IERC20(_token).safeApprove(address(lendingPool()), 0);
 
         emit ForceDisable(_token, balance, aTokenBalance, params.investedAmount);
 

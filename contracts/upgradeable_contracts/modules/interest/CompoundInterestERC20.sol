@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../../../interfaces/ICToken.sol";
 import "../../../interfaces/IComptroller.sol";
 import "../../../interfaces/IOwnable.sol";
+import "../../../interfaces/ILegacyERC20.sol";
 import "../MediatorOwnableModule.sol";
 import "./BaseInterestERC20.sol";
 
@@ -78,7 +79,9 @@ contract CompoundInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
 
         interestParams[token] = InterestParams(_cToken, _dust, 0, _interestReceiver, _minInterestPaid);
 
-        IERC20(token).approve(address(_cToken), uint256(-1));
+        // SafeERC20.safeApprove does not work here in case of possible interest reinitialization,
+        // since it does not allow positive->positive allowance change. However, it would be safe to make such change here.
+        ILegacyERC20(token).approve(address(_cToken), uint256(-1));
 
         emit InterestEnabled(token, address(_cToken));
         emit InterestDustUpdated(token, _dust);
@@ -217,7 +220,7 @@ contract CompoundInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
 
         uint256 balance = IERC20(_token).balanceOf(address(this));
         IERC20(_token).safeTransfer(mediator, balance);
-        IERC20(_token).approve(address(cToken), 0);
+        IERC20(_token).safeApprove(address(cToken), 0);
 
         emit ForceDisable(_token, balance, cTokenBalance, params.investedAmount);
 
