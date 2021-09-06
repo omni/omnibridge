@@ -4,20 +4,20 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../../../interfaces/IAToken.sol";
 import "../../../interfaces/IOwnable.sol";
-import "../../../interfaces/IInterestReceiver.sol";
-import "../../../interfaces/IInterestImplementation.sol";
 import "../../../interfaces/ILendingPool.sol";
+import "../../../interfaces/IStakedTokenIncentivesController.sol";
+import "../../../interfaces/ILegacyERC20.sol";
 import "../MediatorOwnableModule.sol";
+import "./BaseInterestERC20.sol";
 
 /**
  * @title AAVEInterestERC20
  * @dev This contract contains token-specific logic for investing ERC20 tokens into AAVE protocol.
  */
-contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
+contract AAVEInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
     using SafeMath for uint256;
-
-    event PaidInterest(address indexed token, address to, uint256 value);
-    event ForceDisable(address token, uint256 tokensAmount, uint256 aTokensAmount, uint256 investedAmount);
+    using SafeERC20 for IERC20;
+    using SafeERC20 for IAToken;
 
     struct InterestParams {
         IAToken aToken;
@@ -28,8 +28,18 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
     }
 
     mapping(address => InterestParams) public interestParams;
+    uint256 public minAavePaid;
+    address public aaveReceiver;
 
-    constructor(address _omnibridge, address _owner) MediatorOwnableModule(_omnibridge, _owner) {}
+    constructor(
+        address _omnibridge,
+        address _owner,
+        uint256 _minAavePaid,
+        address _aaveReceiver
+    ) MediatorOwnableModule(_omnibridge, _owner) {
+        minAavePaid = _minAavePaid;
+        aaveReceiver = _aaveReceiver;
+    }
 
     /**
      * @dev Tells the module interface version that this contract supports.
@@ -57,10 +67,24 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
     }
 
     /**
+     * @dev Tells the address of the StakedTokenIncentivesController contract in the Ethereum Mainnet.
+     */
+    function incentivesController() public pure virtual returns (IStakedTokenIncentivesController) {
+        return IStakedTokenIncentivesController(0xd784927Ff2f95ba542BfC824c8a8a98F3495f6b5);
+    }
+
+    /**
+     * @dev Tells the address of the StkAAVE token contract in the Ethereum Mainnet.
+     */
+    function stkAAVEToken() public pure virtual returns (address) {
+        return 0x4da27a545c0c5B758a6BA100e3a049001de870f5;
+    }
+
+    /**
      * @dev Enables support for interest earning through a specific aToken.
      * @param _token address of the token contract for which to enable interest.
      * @param _dust small amount of underlying tokens that cannot be paid as an interest. Accounts for possible truncation errors.
-     * @param _interestReceiver address of the interest receiver for underlying token and associated COMP tokens.
+     * @param _interestReceiver address of the interest receiver for underlying token.
      * @param _minInterestPaid min amount of underlying tokens to be paid as an interest.
      */
     function enableInterestToken(
@@ -77,7 +101,14 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
 
         interestParams[_token] = InterestParams(aToken, _dust, 0, _interestReceiver, _minInterestPaid);
 
-        IERC20(_token).approve(address(lendingPool()), uint256(-1));
+        // SafeERC20.safeApprove does not work here in case of possible interest reinitialization,
+        // since it does not allow positive->positive allowance change. However, it would be safe to make such change here.
+        ILegacyERC20(_token).approve(address(lendingPool()), uint256(-1));
+
+        emit InterestEnabled(_token, address(aToken));
+        emit InterestDustUpdated(_token, _dust);
+        emit InterestReceiverUpdated(_token, _interestReceiver);
+        emit MinInterestPaidUpdated(_token, _minInterestPaid);
     }
 
     /**
@@ -112,7 +143,7 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
     }
 
     /**
-     * @dev Withdraws at least the given amount of tokens from the AAVE protocol.
+     * @dev Withdraws at least min(_amount, investedAmount) of tokens from the AAVE protocol.
      * Only Omnibridge contract is allowed to call this method.
      * Converts aTOKENs into _amount of TOKENs.
      * @param _token address of the invested token contract.
@@ -123,7 +154,7 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
         uint256 invested = params.investedAmount;
         uint256 redeemed = _safeWithdraw(_token, _amount > invested ? invested : _amount);
         params.investedAmount = redeemed > invested ? 0 : invested - redeemed;
-        IERC20(_token).transfer(mediator, redeemed);
+        IERC20(_token).safeTransfer(mediator, redeemed);
     }
 
     /**
@@ -146,11 +177,34 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
      * Earned interest is withdrawn and transferred to the specified interest receiver account.
      * @param _token address of the invested token contract in which interest should be paid.
      */
-    function payInterest(address _token) external {
+    function payInterest(address _token) external onlyEOA {
         InterestParams storage params = interestParams[_token];
         uint256 interest = interestAmount(_token);
         require(interest >= params.minInterestPaid);
         _transferInterest(params.interestReceiver, address(_token), _safeWithdraw(_token, interest));
+    }
+
+    /**
+     * @dev Tells the amount of earned stkAAVE tokens for supplying assets into the protocol that can be withdrawn.
+     * Intended to be called via eth_call to obtain the current accumulated value for stkAAVE.
+     * @param _assets aTokens addresses to claim stkAAVE for.
+     * @return amount of accumulated stkAAVE tokens across given markets.
+     */
+    function aaveAmount(address[] calldata _assets) public view returns (uint256) {
+        return incentivesController().getRewardsBalance(_assets, address(this));
+    }
+
+    /**
+     * @dev Claims stkAAVE token received by supplying underlying tokens and transfers it to the associated AAVE receiver.
+     * @param _assets aTokens addresses to claim stkAAVE for.
+     */
+    function claimAaveAndPay(address[] calldata _assets) external onlyEOA {
+        uint256 balance = aaveAmount(_assets);
+        require(balance >= minAavePaid);
+
+        incentivesController().claimRewards(_assets, balance, address(this));
+
+        _transferInterest(aaveReceiver, stkAAVEToken(), balance);
     }
 
     /**
@@ -163,24 +217,22 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
         InterestParams storage params = interestParams[_token];
         IAToken aToken = params.aToken;
 
-        uint256 aTokenBalance = aToken.balanceOf(address(this));
+        uint256 aTokenBalance = 0;
         // try to redeem all aTokens
-        try lendingPool().withdraw(_token, aTokenBalance, mediator) {
-            aTokenBalance = 0;
-        } catch {
-            aToken.transfer(mediator, aTokenBalance);
+        // it is safe to specify uint256(-1) as max amount of redeemed tokens
+        // since the withdraw method of the pool contract will return the entire balance
+        try lendingPool().withdraw(_token, uint256(-1), mediator) {} catch {
+            aTokenBalance = aToken.balanceOf(address(this));
+            aToken.safeTransfer(mediator, aTokenBalance);
         }
 
         uint256 balance = IERC20(_token).balanceOf(address(this));
-        IERC20(_token).transfer(mediator, balance);
+        IERC20(_token).safeTransfer(mediator, balance);
+        IERC20(_token).safeApprove(address(lendingPool()), 0);
 
         emit ForceDisable(_token, balance, aTokenBalance, params.investedAmount);
 
-        delete params.aToken;
-        delete params.dust;
-        delete params.investedAmount;
-        delete params.minInterestPaid;
-        delete params.interestReceiver;
+        delete interestParams[_token];
     }
 
     /**
@@ -191,6 +243,7 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
      */
     function setDust(address _token, uint96 _dust) external onlyOwner {
         interestParams[_token].dust = _dust;
+        emit InterestDustUpdated(_token, _dust);
     }
 
     /**
@@ -202,6 +255,7 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
      */
     function setInterestReceiver(address _token, address _receiver) external onlyOwner {
         interestParams[_token].interestReceiver = _receiver;
+        emit InterestReceiverUpdated(_token, _receiver);
     }
 
     /**
@@ -212,6 +266,28 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
      */
     function setMinInterestPaid(address _token, uint256 _minInterestPaid) external onlyOwner {
         interestParams[_token].minInterestPaid = _minInterestPaid;
+        emit MinInterestPaidUpdated(_token, _minInterestPaid);
+    }
+
+    /**
+     * @dev Updates min stkAAVE amount that can be transferred in single call.
+     * Only owner is allowed to call this method.
+     * @param _minAavePaid new amount of stkAAVE and can be transferred to the interest receiver in single operation.
+     */
+    function setMinAavePaid(uint256 _minAavePaid) external onlyOwner {
+        minAavePaid = _minAavePaid;
+        emit MinInterestPaidUpdated(address(stkAAVEToken()), _minAavePaid);
+    }
+
+    /**
+     * @dev Updates address of the accumulated stkAAVE receiver. Can be any address, EOA or contract.
+     * Set to 0x00..00 to disable stkAAVE claims and transfers.
+     * Only owner is allowed to call this method.
+     * @param _receiver address of the interest receiver.
+     */
+    function setAaveReceiver(address _receiver) external onlyOwner {
+        aaveReceiver = _receiver;
+        emit InterestReceiverUpdated(address(stkAAVEToken()), _receiver);
     }
 
     /**
@@ -230,28 +306,5 @@ contract AAVEInterestERC20 is IInterestImplementation, MediatorOwnableModule {
         require(redeemed >= _amount);
 
         return redeemed;
-    }
-
-    /**
-     * @dev Internal function transferring interest tokens to the interest receiver.
-     * Calls a callback on the receiver, interest receiver is a contract.
-     * @param _receiver address of the tokens receiver.
-     * @param _token address of the token contract to send.
-     * @param _amount amount of tokens to transfer.
-     */
-    function _transferInterest(
-        address _receiver,
-        address _token,
-        uint256 _amount
-    ) internal {
-        require(_receiver != address(0));
-
-        IERC20(_token).transfer(_receiver, _amount);
-
-        if (Address.isContract(_receiver)) {
-            IInterestReceiver(_receiver).onInterestReceived(_token);
-        }
-
-        emit PaidInterest(_token, _receiver, _amount);
     }
 }

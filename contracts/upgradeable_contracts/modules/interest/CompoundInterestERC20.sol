@@ -5,19 +5,18 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../../../interfaces/ICToken.sol";
 import "../../../interfaces/IComptroller.sol";
 import "../../../interfaces/IOwnable.sol";
-import "../../../interfaces/IInterestReceiver.sol";
-import "../../../interfaces/IInterestImplementation.sol";
+import "../../../interfaces/ILegacyERC20.sol";
 import "../MediatorOwnableModule.sol";
+import "./BaseInterestERC20.sol";
 
 /**
  * @title CompoundInterestERC20
  * @dev This contract contains token-specific logic for investing ERC20 tokens into Compound protocol.
  */
-contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule {
+contract CompoundInterestERC20 is BaseInterestERC20, MediatorOwnableModule {
     using SafeMath for uint256;
-
-    event PaidInterest(address indexed token, address to, uint256 value);
-    event ForceDisable(address token, uint256 tokensAmount, uint256 cTokensAmount, uint256 investedAmount);
+    using SafeERC20 for IERC20;
+    using SafeERC20 for ICToken;
 
     uint256 internal constant SUCCESS = 0;
 
@@ -65,7 +64,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      * @dev Enables support for interest earning through specific cToken.
      * @param _cToken address of the cToken contract. Underlying token address is derived from this contract.
      * @param _dust small amount of underlying tokens that cannot be paid as an interest. Accounts for possible truncation errors.
-     * @param _interestReceiver address of the interest receiver for underlying token and associated COMP tokens.
+     * @param _interestReceiver address of the interest receiver for underlying token.
      * @param _minInterestPaid min amount of underlying tokens to be paid as an interest.
      */
     function enableInterestToken(
@@ -80,7 +79,14 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
 
         interestParams[token] = InterestParams(_cToken, _dust, 0, _interestReceiver, _minInterestPaid);
 
-        IERC20(token).approve(address(_cToken), uint256(-1));
+        // SafeERC20.safeApprove does not work here in case of possible interest reinitialization,
+        // since it does not allow positive->positive allowance change. However, it would be safe to make such change here.
+        ILegacyERC20(token).approve(address(_cToken), uint256(-1));
+
+        emit InterestEnabled(token, address(_cToken));
+        emit InterestDustUpdated(token, _dust);
+        emit InterestReceiverUpdated(token, _interestReceiver);
+        emit MinInterestPaidUpdated(token, _minInterestPaid);
     }
 
     /**
@@ -129,7 +135,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
     }
 
     /**
-     * @dev Withdraws at least the given amount of tokens from the Compound protocol.
+     * @dev Withdraws at least min(_amount, investedAmount) of tokens from the Compound protocol.
      * Only Omnibridge contract is allowed to call this method.
      * Converts X cTOKENs into _amount of TOKENs.
      * @param _token address of the invested token contract.
@@ -140,7 +146,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
         uint256 invested = params.investedAmount;
         uint256 redeemed = _safeWithdraw(_token, _amount > invested ? invested : _amount);
         params.investedAmount = redeemed > invested ? 0 : invested - redeemed;
-        IERC20(_token).transfer(mediator, redeemed);
+        IERC20(_token).safeTransfer(mediator, redeemed);
     }
 
     /**
@@ -163,7 +169,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      * Earned interest is withdrawn and transferred to the specified interest receiver account.
      * @param _token address of the invested token contract in which interest should be paid.
      */
-    function payInterest(address _token) external {
+    function payInterest(address _token) external onlyEOA {
         InterestParams storage params = interestParams[_token];
         uint256 interest = interestAmount(_token);
         require(interest >= params.minInterestPaid);
@@ -187,7 +193,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      * @dev Claims Comp token received by supplying underlying tokens and transfers it to the associated COMP receiver.
      * @param _markets cTokens addresses to claim COMP for.
      */
-    function claimCompAndPay(address[] calldata _markets) external {
+    function claimCompAndPay(address[] calldata _markets) external onlyEOA {
         uint256 balance = compAmount(_markets);
         require(balance >= minCompPaid);
         _transferInterest(compReceiver, address(compToken()), balance);
@@ -209,19 +215,16 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
             cTokenBalance = 0;
         } else {
             // transfer cTokens as-is, if redeem has failed
-            cToken.transfer(mediator, cTokenBalance);
+            cToken.safeTransfer(mediator, cTokenBalance);
         }
 
         uint256 balance = IERC20(_token).balanceOf(address(this));
-        IERC20(_token).transfer(mediator, balance);
+        IERC20(_token).safeTransfer(mediator, balance);
+        IERC20(_token).safeApprove(address(cToken), 0);
 
         emit ForceDisable(_token, balance, cTokenBalance, params.investedAmount);
 
-        delete params.cToken;
-        delete params.dust;
-        delete params.investedAmount;
-        delete params.minInterestPaid;
-        delete params.interestReceiver;
+        delete interestParams[_token];
     }
 
     /**
@@ -232,6 +235,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      */
     function setDust(address _token, uint96 _dust) external onlyOwner {
         interestParams[_token].dust = _dust;
+        emit InterestDustUpdated(_token, _dust);
     }
 
     /**
@@ -243,6 +247,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      */
     function setInterestReceiver(address _token, address _receiver) external onlyOwner {
         interestParams[_token].interestReceiver = _receiver;
+        emit InterestReceiverUpdated(_token, _receiver);
     }
 
     /**
@@ -253,6 +258,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      */
     function setMinInterestPaid(address _token, uint256 _minInterestPaid) external onlyOwner {
         interestParams[_token].minInterestPaid = _minInterestPaid;
+        emit MinInterestPaidUpdated(_token, _minInterestPaid);
     }
 
     /**
@@ -262,6 +268,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      */
     function setMinCompPaid(uint256 _minCompPaid) external onlyOwner {
         minCompPaid = _minCompPaid;
+        emit MinInterestPaidUpdated(address(compToken()), _minCompPaid);
     }
 
     /**
@@ -272,6 +279,7 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
      */
     function setCompReceiver(address _receiver) external onlyOwner {
         compReceiver = _receiver;
+        emit InterestReceiverUpdated(address(compToken()), _receiver);
     }
 
     /**
@@ -290,28 +298,5 @@ contract CompoundInterestERC20 is IInterestImplementation, MediatorOwnableModule
         require(redeemed >= _amount);
 
         return redeemed;
-    }
-
-    /**
-     * @dev Internal function transferring interest tokens to the interest receiver.
-     * Calls a callback on the receiver, interest receiver is a contract.
-     * @param _receiver address of the tokens receiver.
-     * @param _token address of the token contract to send.
-     * @param _amount amount of tokens to transfer.
-     */
-    function _transferInterest(
-        address _receiver,
-        address _token,
-        uint256 _amount
-    ) internal {
-        require(_receiver != address(0));
-
-        IERC20(_token).transfer(_receiver, _amount);
-
-        if (Address.isContract(_receiver)) {
-            IInterestReceiver(_receiver).onInterestReceived(_token);
-        }
-
-        emit PaidInterest(_token, _receiver, _amount);
     }
 }

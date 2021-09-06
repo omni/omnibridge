@@ -2475,16 +2475,22 @@ function runTests(accounts, isHome) {
       let usdc
       let aDai
       let lendingPool
+      let incentivesController
+      let aave
+      let stkAAVE
       let daiInterestImpl
 
       const borrower = accounts[2]
 
       before(async () => {
-        const contracts = await getAAVEContracts()
+        const contracts = await getAAVEContracts(web3, accounts[8])
         dai = contracts.dai
         usdc = contracts.usdc
         aDai = contracts.aDai
         lendingPool = contracts.lendingPool
+        incentivesController = contracts.incentivesController
+        aave = contracts.aave
+        stkAAVE = contracts.stkAAVE
 
         // create some preliminary deposit
         await dai.mint(ether('10000000'))
@@ -2513,7 +2519,7 @@ function runTests(accounts, isHome) {
           limits: [ether('100'), ether('99'), ether('0.01')],
           executionLimits: [ether('100'), ether('99')],
         })
-        daiInterestImpl = await AAVEInterestERC20.new(contract.address, owner)
+        daiInterestImpl = await AAVEInterestERC20.new(contract.address, owner, 1, accounts[2])
         await daiInterestImpl.enableInterestToken(dai.address, '1', accounts[2], ether('0.01'))
         await dai.approve(contract.address, ether('100'))
         await contract.methods['relayTokens(address,uint256)'](dai.address, ether('10'))
@@ -2607,6 +2613,14 @@ function runTests(accounts, isHome) {
         await daiInterestImpl.setInterestReceiver(dai.address, accounts[1], { from: user }).should.be.rejected
         await daiInterestImpl.setInterestReceiver(dai.address, accounts[1], { from: owner }).should.be.fulfilled
         expect((await daiInterestImpl.interestParams(dai.address)).interestReceiver).to.be.equal(accounts[1])
+
+        await daiInterestImpl.setMinAavePaid(oneEther, { from: user }).should.be.rejected
+        await daiInterestImpl.setMinAavePaid(oneEther, { from: owner }).should.be.fulfilled
+        expect(await daiInterestImpl.minAavePaid()).to.be.bignumber.equal(oneEther)
+
+        await daiInterestImpl.setAaveReceiver(user, { from: user }).should.be.rejected
+        await daiInterestImpl.setAaveReceiver(user, { from: owner }).should.be.fulfilled
+        expect(await daiInterestImpl.aaveReceiver()).to.be.equal(user)
       })
 
       it('should return invested tokens on withdrawal if needed', async () => {
@@ -2679,6 +2693,41 @@ function runTests(accounts, isHome) {
         await daiInterestImpl.enableInterestToken(dai.address, oneEther, accounts[2], ether('0.01')).should.be.fulfilled
         await contract.initializeInterest(dai.address, daiInterestImpl.address, oneEther)
         await contract.invest(dai.address)
+      })
+
+      it('should claim rewards', async () => {
+        await aave.mint(ether('20000000'))
+        await aave.transfer(incentivesController.address, ether('10000000'))
+        await aave.approve(stkAAVE.address, ether('10000000'))
+        await incentivesController.setDistributionEnd('1000000000000000000')
+        await incentivesController.initialize(ZERO_ADDRESS)
+        await incentivesController.configureAssets([aDai.address], [oneEther])
+
+        await contract.initializeInterest(dai.address, daiInterestImpl.address, oneEther)
+        await contract.invest(dai.address)
+
+        await generateInterest()
+
+        expect(await daiInterestImpl.aaveAmount([aDai.address])).to.be.bignumber.gt(ether('0.01'))
+
+        await daiInterestImpl.claimAaveAndPay([aDai.address]).should.be.fulfilled
+
+        expect(await aave.balanceOf(accounts[2])).to.be.bignumber.equal(ZERO)
+        expect(await stkAAVE.balanceOf(accounts[2])).to.be.bignumber.gt(ether('0.01'))
+        expect(await stkAAVE.stakersCooldowns(accounts[2])).to.be.bignumber.equal(ZERO)
+        await stkAAVE.redeem(accounts[2], ether('100000000'), { from: accounts[2] }).should.be.rejected
+        expect(await stkAAVE.cooldown({ from: accounts[2] }))
+        expect(await stkAAVE.stakersCooldowns(accounts[2])).to.be.bignumber.gt(ZERO)
+        await stkAAVE.redeem(accounts[2], ether('100000000'), { from: accounts[2] }).should.be.rejected
+
+        // skip 11 days (COOLDOWN_SECONDS + UNSTAKE_WINDOW / 2)
+        const timestamp = (await web3.eth.getBlock('latest')).timestamp
+        await web3.evm.mineWithTime(timestamp + 11 * 24 * 60 * 60).should.be.fulfilled
+
+        await stkAAVE.redeem(accounts[2], ether('100000000'), { from: accounts[2] }).should.be.fulfilled
+
+        expect(await aave.balanceOf(accounts[2])).to.be.bignumber.gt(ZERO)
+        expect(await stkAAVE.balanceOf(accounts[2])).to.be.bignumber.equal(ZERO)
       })
     })
   }
