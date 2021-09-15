@@ -138,11 +138,11 @@ FOREIGN_TOKEN_FACTORY=
 
 # suffix used for token names for tokens bridged from Foreign to Home
 # usually you might want it to start with a space character
-HOME_TOKEN_NAME_SUFFIX=""
+HOME_TOKEN_NAME_SUFFIX=from XXX
 
 # suffix used for token names for tokens bridged from Home to Foreign
 # usually you might want it to start with a space character
-FOREIGN_TOKEN_NAME_SUFFIX=""
+FOREIGN_TOKEN_NAME_SUFFIX=from YYY
 
 # The api url of an explorer to verify all the deployed contracts in Home network. Supported explorers: Blockscout, etherscan
 #HOME_EXPLORER_URL=https://blockscout.com/poa/core/api
