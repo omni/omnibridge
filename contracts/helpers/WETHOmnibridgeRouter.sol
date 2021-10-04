@@ -52,6 +52,18 @@ contract WETHOmnibridgeRouter is OwnableModule, Claimable {
         bridge.relayTokens(address(WETH), _receiver, msg.value);
     }
 
+
+    /**
+    * @dev Wraps native assets and relays wrapped ERC20 tokens to the other chain.
+    * It also calls receiver on other side with the _data provided.
+    * @param _receiver bridged assets receiver on the other side of the bridge.
+    * @param _data data for the call of receiver on other side.
+    */
+    function wrapAndRelayTokens(address _receiver, bytes memory _data) public payable {
+        WETH.deposit{ value: msg.value }();
+        bridge.relayTokensAndCall(address(WETH), _receiver, msg.value, _data);
+    }
+
     /**
      * @dev Bridged callback function used for unwrapping received tokens.
      * Can only be called by the associated Omnibridge contract.
