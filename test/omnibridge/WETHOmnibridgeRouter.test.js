@@ -65,6 +65,24 @@ contract('WETHOmnibridgeRouter', (accounts) => {
     expect(ambEvents[1].returnValues.data).to.include(accounts[2].slice(2).toLowerCase())
   })
 
+  it('wrapAndRelayTokens with data', async () => {
+    const WETHRouter = await WETHOmnibridgeRouter.new(mediator.address, token.address, owner)
+
+    const method = WETHRouter.methods['wrapAndRelayTokens(address,bytes)']
+    await method(accounts[2], '0xdeadbeaf', { from: user, value: oneEther }).should.be.fulfilled
+
+    const depositEvents = await getEvents(mediator, { event: 'TokensBridgingInitiated' })
+    expect(depositEvents.length).to.be.equal(1)
+    expect(depositEvents[0].returnValues.token).to.be.equal(token.address)
+    expect(depositEvents[0].returnValues.sender).to.be.equal(WETHRouter.address)
+    expect(depositEvents[0].returnValues.value).to.be.equal(oneEther.toString())
+    expect(depositEvents[0].returnValues.messageId).to.include('0x11223344')
+    const ambEvents = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
+    expect(ambEvents.length).to.be.equal(1)
+    expect(ambEvents[0].returnValues.data).to.include(accounts[2].slice(2).toLowerCase())
+    expect(ambEvents[0].returnValues.data).to.include('deadbeaf')
+  })
+
   it('onTokenBridged', async () => {
     const stubMediator = accounts[2]
     const WETHRouter = await WETHOmnibridgeRouter.new(stubMediator, token.address, owner)
