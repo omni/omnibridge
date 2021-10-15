@@ -26,6 +26,9 @@ ${FLATTENER} ${BRIDGE_CONTRACTS_DIR}/modules/interest/AAVEInterestERC20.sol > fl
 echo "Flattening token contracts"
 cp ./precompiled/PermittableToken_flat.sol flats
 
+echo "Flattening WETH OB Router"
+${FLATTENER} contracts/helpers/WETHOmnibridgeRouter.sol > flats/WETHOmnibridgeRouter_flat.sol
+
 for file in flats/*.sol; do
   grep -v SPDX "$file" > tmp; mv tmp "$file"
 done
