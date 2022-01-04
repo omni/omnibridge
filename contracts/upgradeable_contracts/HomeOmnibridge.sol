@@ -45,7 +45,7 @@ contract HomeOmnibridge is
         address _tokenFactory,
         address _feeManager,
         address _forwardingRulesManager
-    ) external onlyRelevantSender returns (bool) {
+    ) external onlyRelevantSender {
         require(!isInitialized());
 
         _setBridgeContract(_bridgeContract);
@@ -59,8 +59,6 @@ contract HomeOmnibridge is
         _setForwardingRulesManager(_forwardingRulesManager);
 
         setInitialize();
-
-        return isInitialized();
     }
 
     /**

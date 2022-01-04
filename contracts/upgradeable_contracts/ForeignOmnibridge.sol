@@ -37,7 +37,7 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager, InterestConnecto
         uint256 _requestGasLimit,
         address _owner,
         address _tokenFactory
-    ) external onlyRelevantSender returns (bool) {
+    ) external onlyRelevantSender {
         require(!isInitialized());
 
         _setBridgeContract(_bridgeContract);
@@ -49,8 +49,6 @@ contract ForeignOmnibridge is BasicOmnibridge, GasLimitManager, InterestConnecto
         _setTokenFactory(_tokenFactory);
 
         setInitialize();
-
-        return isInitialized();
     }
 
     /**

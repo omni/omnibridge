@@ -141,7 +141,10 @@ function runTests(accounts, isHome) {
   })
 
   beforeEach(async () => {
-    contract = await Mediator.new(SUFFIX)
+    const proxy = await EternalStorageProxy.new()
+    const impl = await Mediator.new(SUFFIX)
+    await proxy.upgradeTo('1', impl.address)
+    contract = await Mediator.at(proxy.address)
     ambBridgeContract = await AMBMock.new()
     token = await ERC677BridgeToken.new('TEST', 'TST', 18)
     currentDay = await contract.getCurrentDay()
@@ -162,9 +165,6 @@ function runTests(accounts, isHome) {
 
   describe('claimTokens', () => {
     beforeEach(async () => {
-      const storageProxy = await EternalStorageProxy.new()
-      await storageProxy.upgradeTo('1', contract.address).should.be.fulfilled
-      contract = await Mediator.at(storageProxy.address)
       await initialize().should.be.fulfilled
     })
 
@@ -850,14 +850,8 @@ function runTests(accounts, isHome) {
 
         describe('fixMediatorBalance', () => {
           beforeEach(async () => {
-            const storageProxy = await EternalStorageProxy.new()
-            await storageProxy.upgradeTo('1', contract.address).should.be.fulfilled
-            contract = await Mediator.at(storageProxy.address)
-
             await token.mint(user, twoEthers, { from: owner }).should.be.fulfilled
             await token.mint(contract.address, twoEthers, { from: owner }).should.be.fulfilled
-
-            await initialize().should.be.fulfilled
 
             await token.transferAndCall(contract.address, oneEther, '0x', { from: user }).should.be.fulfilled
 
@@ -2273,9 +2267,6 @@ function runTests(accounts, isHome) {
       })
 
       beforeEach(async () => {
-        const storageProxy = await EternalStorageProxy.new()
-        await storageProxy.upgradeTo('1', contract.address).should.be.fulfilled
-        contract = await Mediator.at(storageProxy.address)
         await initialize({
           limits: [ether('100'), ether('99'), ether('0.01')],
           executionLimits: [ether('100'), ether('99')],
@@ -2512,9 +2503,6 @@ function runTests(accounts, isHome) {
       })
 
       beforeEach(async () => {
-        const storageProxy = await EternalStorageProxy.new()
-        await storageProxy.upgradeTo('1', contract.address).should.be.fulfilled
-        contract = await Mediator.at(storageProxy.address)
         await initialize({
           limits: [ether('100'), ether('99'), ether('0.01')],
           executionLimits: [ether('100'), ether('99')],
