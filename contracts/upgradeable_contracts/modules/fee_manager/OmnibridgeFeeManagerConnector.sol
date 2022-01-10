@@ -50,7 +50,7 @@ abstract contract OmnibridgeFeeManagerConnector is Ownable {
      * @dev Internal function for calculating and distributing fee through the separate fee manager contract.
      * @param _feeType type of the fee, can be one of [HOME_TO_FOREIGN_FEE, FOREIGN_TO_HOME_FEE].
      * @param _isNative true, if distributed token is native to this side of the bridge.
-     * @param _from address of the tokens sender, needed only if _feeType is HOME_TO_FOREIGN_FEE.
+     * @param _from address of the tokens sender.
      * @param _token address of the token contract, for which fee should be processed.
      * @param _value amount of tokens bridged.
      * @return total amount of fee distributed.
@@ -71,7 +71,7 @@ abstract contract OmnibridgeFeeManagerConnector is Ownable {
             if (_feeType == HOME_TO_FOREIGN_FEE && manager.isRewardAddress(_from)) {
                 return 0;
             }
-            uint256 fee = manager.calculateFee(_feeType, _token, _value);
+            uint256 fee = manager.calculateFee(_feeType, _token, _from, _value);
             if (fee > 0) {
                 if (_feeType == HOME_TO_FOREIGN_FEE) {
                     // for home -> foreign direction, fee is collected using transfer(address,uint256) method

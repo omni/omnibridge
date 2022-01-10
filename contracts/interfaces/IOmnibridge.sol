@@ -1,6 +1,8 @@
 pragma solidity 0.7.5;
 
 interface IOmnibridge {
+    function relayTokens(address _token, uint256 _value) external;
+
     function relayTokens(
         address _token,
         address _receiver,

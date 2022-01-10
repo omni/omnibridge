@@ -1,4 +1,6 @@
 pragma solidity 0.7.5;
+// solhint-disable-next-line compiler-version
+pragma abicoder v2;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -19,32 +21,40 @@ contract OmnibridgeFeeManager is MediatorOwnableModule {
     uint256 internal constant MAX_FEE = 1 ether;
     uint256 internal constant MAX_REWARD_ACCOUNTS = 50;
 
+    address internal constant ANY_ADDRESS = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
     bytes32 public constant HOME_TO_FOREIGN_FEE = 0x741ede137d0537e88e0ea0ff25b1f22d837903dbbee8980b4a06e8523247ee26; // keccak256(abi.encodePacked("homeToForeignFee"))
     bytes32 public constant FOREIGN_TO_HOME_FEE = 0x03be2b2875cb41e0e77355e802a16769bb8dfcf825061cde185c73bf94f12625; // keccak256(abi.encodePacked("foreignToHomeFee"))
 
-    // mapping feeType => token address => fee percentage
-    mapping(bytes32 => mapping(address => uint256)) internal fees;
+    struct FeeParams {
+        uint256 percentage;
+        uint256 minFee;
+        uint256 maxFee;
+    }
+
+    // mapping feeType => token address => token sender => fee params
+    mapping(bytes32 => mapping(address => mapping(address => FeeParams))) internal fees;
     address[] internal rewardAddresses;
 
-    event FeeUpdated(bytes32 feeType, address indexed token, uint256 fee);
+    event FeeUpdated(bytes32 indexed feeType, address indexed token, address sender, FeeParams fee);
 
     /**
      * @dev Stores the initial parameters of the fee manager.
      * @param _mediator address of the mediator contract used together with this fee manager.
      * @param _owner address of the contract owner.
      * @param _rewardAddresses list of unique initial reward addresses, between whom fees will be distributed
-     * @param _fees array with initial fees for both bridge directions.
-     *   [ 0 = homeToForeignFee, 1 = foreignToHomeFee ]
+     * @param _homeToForeignFees initial fee parameters for HOME_TO_FOREIGN direction.
+     * @param _foreignToHomeFees initial fee parameters for FOREIGN_TO_HOME direction.
      */
     constructor(
         address _mediator,
         address _owner,
         address[] memory _rewardAddresses,
-        uint256[2] memory _fees
+        FeeParams memory _homeToForeignFees,
+        FeeParams memory _foreignToHomeFees
     ) MediatorOwnableModule(_mediator, _owner) {
         require(_rewardAddresses.length <= MAX_REWARD_ACCOUNTS);
-        _setFee(HOME_TO_FOREIGN_FEE, address(0), _fees[0]);
-        _setFee(FOREIGN_TO_HOME_FEE, address(0), _fees[1]);
+        _setFee(HOME_TO_FOREIGN_FEE, ANY_ADDRESS, ANY_ADDRESS, _homeToForeignFees);
+        _setFee(FOREIGN_TO_HOME_FEE, ANY_ADDRESS, ANY_ADDRESS, _foreignToHomeFees);
 
         for (uint256 i = 0; i < _rewardAddresses.length; i++) {
             require(_isValidAddress(_rewardAddresses[i]));
@@ -70,16 +80,7 @@ contract OmnibridgeFeeManager is MediatorOwnableModule {
             uint64 patch
         )
     {
-        return (1, 0, 0);
-    }
-
-    /**
-     * @dev Throws if given fee amount is invalid.
-     */
-    modifier validFee(uint256 _fee) {
-        require(_fee < MAX_FEE);
-        /* solcov ignore next */
-        _;
+        return (2, 0, 0);
     }
 
     /**
@@ -96,49 +97,68 @@ contract OmnibridgeFeeManager is MediatorOwnableModule {
      * Only the owner can call this method.
      * @param _feeType type of the updated fee, can be one of [HOME_TO_FOREIGN_FEE, FOREIGN_TO_HOME_FEE].
      * @param _token address of the token contract for which fee should apply, 0x00..00 describes the initial fee for newly created tokens.
-     * @param _fee new fee value, in percentage (1 ether == 10**18 == 100%).
+     * @param _sender address of the specific tokens sender to apply fees for.
+     * @param _params new fee parameters.
      */
     function setFee(
         bytes32 _feeType,
         address _token,
-        uint256 _fee
+        address _sender,
+        FeeParams memory _params
     ) external validFeeType(_feeType) onlyOwner {
-        _setFee(_feeType, _token, _fee);
+        _setFee(_feeType, _token, _sender, _params);
     }
 
     /**
      * @dev Retrieves the value for the particular fee type.
      * @param _feeType type of the updated fee, can be one of [HOME_TO_FOREIGN_FEE, FOREIGN_TO_HOME_FEE].
      * @param _token address of the token contract for which fee should apply, 0x00..00 describes the initial fee for newly created tokens.
-     * @return fee value associated with the requested fee type.
+     * @param _sender address of the specific tokens sender to get fees for.
+     * @return fee parameters value associated with the specific fee type, token and sender addresses.
      */
-    function getFee(bytes32 _feeType, address _token) public view validFeeType(_feeType) returns (uint256) {
-        // use token-specific fee if one is registered
-        uint256 _tokenFee = fees[_feeType][_token];
-        if (_tokenFee > 0) {
-            return _tokenFee - 1;
+    function getFee(
+        bytes32 _feeType,
+        address _token,
+        address _sender
+    ) public view validFeeType(_feeType) returns (FeeParams memory) {
+        FeeParams memory params = fees[_feeType][_token][_sender];
+        if (params.maxFee > 0) {
+            return params;
         }
-        // use default fee otherwise
-        return fees[_feeType][address(0)] - 1;
+        params = fees[_feeType][ANY_ADDRESS][_sender];
+        if (params.maxFee > 0) {
+            return params;
+        }
+        params = fees[_feeType][_token][ANY_ADDRESS];
+        if (params.maxFee > 0) {
+            return params;
+        }
+        return fees[_feeType][ANY_ADDRESS][ANY_ADDRESS];
     }
 
     /**
      * @dev Calculates the amount of fee to pay for the value of the particular fee type.
      * @param _feeType type of the updated fee, can be one of [HOME_TO_FOREIGN_FEE, FOREIGN_TO_HOME_FEE].
      * @param _token address of the token contract for which fee should apply, 0x00..00 describes the initial fee for newly created tokens.
+     * @param _sender address of the specific tokens sender to get fees for.
      * @param _value bridged value, for which fee should be evaluated.
      * @return amount of fee to be subtracted from the transferred value.
      */
     function calculateFee(
         bytes32 _feeType,
         address _token,
+        address _sender,
         uint256 _value
     ) public view returns (uint256) {
         if (rewardAddresses.length == 0) {
             return 0;
         }
-        uint256 _fee = getFee(_feeType, _token);
-        return _value.mul(_fee).div(MAX_FEE);
+        FeeParams memory params = getFee(_feeType, _token, _sender);
+        uint256 proportionalFee = _value.mul(params.percentage).div(MAX_FEE);
+        return
+            proportionalFee > params.minFee
+                ? (proportionalFee > params.maxFee ? params.maxFee : proportionalFee)
+                : params.minFee;
     }
 
     /**
@@ -240,15 +260,21 @@ contract OmnibridgeFeeManager is MediatorOwnableModule {
      * @dev Internal function for updating the fee value for the given fee type.
      * @param _feeType type of the updated fee, can be one of [HOME_TO_FOREIGN_FEE, FOREIGN_TO_HOME_FEE].
      * @param _token address of the token contract for which fee should apply, 0x00..00 describes the initial fee for newly created tokens.
-     * @param _fee new fee value, in percentage (1 ether == 10**18 == 100%).
+     * @param _sender address of the specific tokens sender to set fees for.
+     * @param _params new fee parameters.
      */
     function _setFee(
         bytes32 _feeType,
         address _token,
-        uint256 _fee
-    ) internal validFee(_fee) {
-        fees[_feeType][_token] = 1 + _fee;
-        emit FeeUpdated(_feeType, _token, _fee);
+        address _sender,
+        FeeParams memory _params
+    ) internal {
+        require(_params.percentage < MAX_FEE);
+        require(_params.minFee <= _params.maxFee);
+
+        fees[_feeType][_token][_sender] = _params;
+
+        emit FeeUpdated(_feeType, _token, _sender, _params);
     }
 
     /**

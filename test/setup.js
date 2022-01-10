@@ -1,4 +1,4 @@
-const { BN, toBN } = web3.utils
+const { BN, toBN, toWei } = web3.utils
 
 require('chai').use(require('chai-as-promised')).use(require('chai-bn')(BN))
 
@@ -8,6 +8,7 @@ const truffleContract = require('@truffle/contract')
 
 exports.BN = BN
 exports.toBN = toBN
+exports.toWei = toWei
 exports.ERROR_MSG = 'VM Exception while processing transaction: revert'
 exports.ERROR_MSG_OPCODE = 'VM Exception while processing transaction: invalid opcode'
 exports.ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'

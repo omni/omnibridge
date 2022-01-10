@@ -127,7 +127,7 @@ contract HomeOmnibridge is
         addTotalExecutedPerDay(_token, getCurrentDay(), _value);
 
         uint256 valueToBridge = _value;
-        uint256 fee = _distributeFee(FOREIGN_TO_HOME_FEE, _isNative, address(0), _token, valueToBridge);
+        uint256 fee = _distributeFee(FOREIGN_TO_HOME_FEE, _isNative, _recipient, _token, valueToBridge);
         bytes32 _messageId = messageId();
         if (fee > 0) {
             emit FeeDistributed(fee, _token, _messageId);

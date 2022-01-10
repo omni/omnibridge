@@ -69,9 +69,19 @@ async function deployHome() {
     HOME_TO_FOREIGN_FEE: ${homeFeeInWei} which is ${HOME_TRANSACTIONS_FEE * 100}%
     FOREIGN_TO_HOME_FEE: ${foreignFeeInWei} which is ${FOREIGN_TRANSACTIONS_FEE * 100}%
     `)
+    const homeFee = {
+      percentage: homeFeeInWei,
+      minFee: '0',
+      maxFee: toWei('100'),
+    }
+    const foreignFee = {
+      percentage: foreignFeeInWei,
+      minFee: '0',
+      maxFee: toWei('100'),
+    }
     const manager = await deployContract(
       OmnibridgeFeeManager,
-      [homeBridgeStorage.options.address, HOME_BRIDGE_OWNER, rewardList, [homeFeeInWei, foreignFeeInWei]],
+      [homeBridgeStorage.options.address, HOME_BRIDGE_OWNER, rewardList, homeFee, foreignFee],
       { nonce: nonce++ }
     )
     feeManager = manager.options.address

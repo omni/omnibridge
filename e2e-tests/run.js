@@ -233,8 +233,10 @@ async function createEnv(web3Home, web3Foreign) {
   const feeEnabled = (await feeManager.methods.rewardAddressCount().call()) > 0
 
   console.log('Fetching fee values')
-  const homeFee = toBN(feeEnabled ? await feeManager.methods.getFee(homeFeeType, ZERO_ADDRESS).call() : 0)
-  const foreignFee = toBN(feeEnabled ? await feeManager.methods.getFee(foreignFeeType, ZERO_ADDRESS).call() : 0)
+  const homeFeeParams = await feeManager.methods.getFee(homeFeeType, ZERO_ADDRESS, ZERO_ADDRESS).call()
+  const foreignFeeParams = await feeManager.methods.getFee(foreignFeeType, ZERO_ADDRESS, ZERO_ADDRESS).call()
+  const homeFee = toBN(feeEnabled ? homeFeeParams.percentage : 0)
+  const foreignFee = toBN(feeEnabled ? foreignFeeParams.percentage : 0)
   const oneEthBN = toBN('1000000000000000000')
   console.log(`Home fee: ${homeFee.div(toBN('10000000000000000')).toString(10)}%`)
   console.log(`Foreign fee: ${foreignFee.div(toBN('10000000000000000')).toString(10)}%`)
