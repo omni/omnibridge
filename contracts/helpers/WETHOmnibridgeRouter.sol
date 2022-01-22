@@ -75,7 +75,7 @@ contract WETHOmnibridgeRouter is OwnableModule, Claimable {
         address _token,
         uint256 _value,
         bytes memory _data
-    ) external {
+    ) external virtual {
         require(_token == address(WETH));
         require(msg.sender == address(bridge));
         require(_data.length == 20);
