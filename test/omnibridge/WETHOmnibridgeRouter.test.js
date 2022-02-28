@@ -1,4 +1,5 @@
 const ForeignOmnibridge = artifacts.require('ForeignOmnibridge')
+const EternalStorageProxy = artifacts.require('EternalStorageProxy')
 const AMBMock = artifacts.require('AMBMock')
 const TokenFactory = artifacts.require('TokenFactory')
 const WETHOmnibridgeRouter = artifacts.require('WETHOmnibridgeRouter')
@@ -27,7 +28,10 @@ contract('WETHOmnibridgeRouter', (accounts) => {
 
     const tokenImage = await PermittableToken.new('TEST', 'TST', 18, 1337)
     const tokenFactory = await TokenFactory.new(owner, tokenImage.address)
-    mediator = await ForeignOmnibridge.new(' on Testnet')
+    const proxy = await EternalStorageProxy.new()
+    const impl = await ForeignOmnibridge.new(' on Testnet')
+    await proxy.upgradeTo('1', impl.address)
+    mediator = await ForeignOmnibridge.at(proxy.address)
     ambBridgeContract = await AMBMock.new()
     await mediator.initialize(
       ambBridgeContract.address,
