@@ -13,7 +13,7 @@ const AAVEInterestERC20 = artifacts.require('AAVEInterestERC20Mock')
 
 const { expect } = require('chai')
 const { getEvents, ether, expectEventInLogs } = require('../helpers/helpers')
-const { ZERO_ADDRESS, toBN, requirePrecompiled } = require('../setup')
+const { ZERO_ADDRESS, toBN, toWei, requirePrecompiled } = require('../setup')
 const getCompoundContracts = require('../compound/contracts')
 const getAAVEContracts = require('../aave/contracts')
 
@@ -1674,12 +1674,39 @@ function runTests(accounts, isHome) {
 
   if (isHome) {
     describe('fees management', () => {
+      const ANY_ADDRESS = '0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF'
+      const toFee = ({ percentage, minFee, maxFee }) => ({ percentage, minFee, maxFee })
+      const ZERO_FEE = {
+        percentage: '0',
+        minFee: '0',
+        maxFee: toWei('100'),
+      }
+      const ONE_PERCENT_FEE = {
+        percentage: toWei('0.01'),
+        minFee: '0',
+        maxFee: toWei('100'),
+      }
+      const TWO_PERCENT_FEE = {
+        percentage: toWei('0.02'),
+        minFee: '0',
+        maxFee: toWei('100'),
+      }
+      const TEN_PERCENT_FEE = {
+        percentage: toWei('0.1'),
+        minFee: '0',
+        maxFee: toWei('100'),
+      }
+      const TWENTY_PERCENT_FEE = {
+        percentage: toWei('0.2'),
+        minFee: '0',
+        maxFee: toWei('100'),
+      }
       let homeToForeignFee
       let foreignToHomeFee
       let feeManager
       beforeEach(async () => {
         await initialize().should.be.fulfilled
-        feeManager = await OmnibridgeFeeManager.new(contract.address, owner, [owner], [ether('0.02'), ether('0.01')])
+        feeManager = await OmnibridgeFeeManager.new(contract.address, owner, [owner], TWO_PERCENT_FEE, ONE_PERCENT_FEE)
         await contract.setFeeManager(feeManager.address, { from: owner }).should.be.fulfilled
 
         const initialEvents = await getEvents(ambBridgeContract, { event: 'MockedEvent' })
@@ -1728,8 +1755,8 @@ function runTests(accounts, isHome) {
           await token.mint(user, ether('10'), { from: owner }).should.be.fulfilled
           await token.transferAndCall(contract.address, value, '0x', { from: user }).should.be.fulfilled
 
-          expect(await feeManager.getFee(homeToForeignFee, token.address)).to.be.bignumber.equal(ether('0.02'))
-          expect(await feeManager.getFee(foreignToHomeFee, token.address)).to.be.bignumber.equal(ether('0.01'))
+          expect(toFee(await feeManager.getFee(homeToForeignFee, token.address, user))).to.be.eql(TWO_PERCENT_FEE)
+          expect(toFee(await feeManager.getFee(foreignToHomeFee, token.address, user))).to.be.eql(ONE_PERCENT_FEE)
         })
 
         it('should initialize fees for bridged token', async () => {
@@ -1738,32 +1765,42 @@ function runTests(accounts, isHome) {
           expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
           const bridgedToken = await contract.bridgedTokenAddress(otherSideToken1)
 
-          expect(await feeManager.getFee(homeToForeignFee, bridgedToken)).to.be.bignumber.equal(ether('0.02'))
-          expect(await feeManager.getFee(foreignToHomeFee, bridgedToken)).to.be.bignumber.equal(ether('0.01'))
+          expect(toFee(await feeManager.getFee(homeToForeignFee, bridgedToken, user))).to.be.eql(TWO_PERCENT_FEE)
+          expect(toFee(await feeManager.getFee(foreignToHomeFee, bridgedToken, user))).to.be.eql(ONE_PERCENT_FEE)
         })
       })
 
       describe('update fee parameters', () => {
         it('should update default fee value', async () => {
-          await feeManager.setFee(homeToForeignFee, ZERO_ADDRESS, ether('0.1'), { from: user }).should.be.rejected
-          await feeManager.setFee(homeToForeignFee, ZERO_ADDRESS, ether('1.1'), { from: owner }).should.be.rejected
-          const { logs } = await feeManager.setFee(homeToForeignFee, ZERO_ADDRESS, ether('0.1'), { from: owner }).should
-            .be.fulfilled
+          await feeManager.setFee(homeToForeignFee, ANY_ADDRESS, ANY_ADDRESS, TEN_PERCENT_FEE, { from: user }).should.be
+            .rejected
+          await feeManager.setFee(
+            homeToForeignFee,
+            ANY_ADDRESS,
+            ANY_ADDRESS,
+            { percentage: toWei('1.1'), minFee: '0', maxFee: '100' },
+            { from: owner }
+          ).should.be.rejected
+          await feeManager.setFee(
+            homeToForeignFee,
+            ANY_ADDRESS,
+            ANY_ADDRESS,
+            { percentage: toWei('0.1'), minFee: '100', maxFee: '0' },
+            { from: owner }
+          ).should.be.rejected
+          const { logs } = await feeManager.setFee(homeToForeignFee, ANY_ADDRESS, ANY_ADDRESS, TEN_PERCENT_FEE)
 
           expectEventInLogs(logs, 'FeeUpdated')
-          expect(await feeManager.getFee(homeToForeignFee, ZERO_ADDRESS)).to.be.bignumber.equal(ether('0.1'))
-          expect(await feeManager.getFee(foreignToHomeFee, ZERO_ADDRESS)).to.be.bignumber.equal(ether('0.01'))
+          expect(toFee(await feeManager.getFee(homeToForeignFee, token.address, user))).to.be.eql(TEN_PERCENT_FEE)
+          expect(toFee(await feeManager.getFee(foreignToHomeFee, token.address, user))).to.be.eql(ONE_PERCENT_FEE)
         })
 
         it('should update default opposite direction fee value', async () => {
-          await feeManager.setFee(foreignToHomeFee, ZERO_ADDRESS, ether('0.1'), { from: user }).should.be.rejected
-          await feeManager.setFee(foreignToHomeFee, ZERO_ADDRESS, ether('1.1'), { from: owner }).should.be.rejected
-          const { logs } = await feeManager.setFee(foreignToHomeFee, ZERO_ADDRESS, ether('0.1'), { from: owner }).should
-            .be.fulfilled
+          const { logs } = await feeManager.setFee(foreignToHomeFee, ANY_ADDRESS, ANY_ADDRESS, TEN_PERCENT_FEE)
 
           expectEventInLogs(logs, 'FeeUpdated')
-          expect(await feeManager.getFee(foreignToHomeFee, ZERO_ADDRESS)).to.be.bignumber.equal(ether('0.1'))
-          expect(await feeManager.getFee(homeToForeignFee, ZERO_ADDRESS)).to.be.bignumber.equal(ether('0.02'))
+          expect(toFee(await feeManager.getFee(foreignToHomeFee, token.address, user))).to.be.eql(TEN_PERCENT_FEE)
+          expect(toFee(await feeManager.getFee(homeToForeignFee, token.address, user))).to.be.eql(TWO_PERCENT_FEE)
         })
 
         it('should update fee value for native token', async () => {
@@ -1771,19 +1808,18 @@ function runTests(accounts, isHome) {
 
           await token.transferAndCall(contract.address, value, '0x', { from: user }).should.be.fulfilled
 
-          await feeManager.setFee(homeToForeignFee, token.address, ether('0.1'), { from: user }).should.be.rejected
-          await feeManager.setFee(homeToForeignFee, token.address, ether('1.1'), { from: owner }).should.be.rejected
-          const { logs: logs1 } = await feeManager.setFee(homeToForeignFee, token.address, ether('0.1'), {
-            from: owner,
-          }).should.be.fulfilled
-          const { logs: logs2 } = await feeManager.setFee(foreignToHomeFee, token.address, ether('0.2'), {
-            from: owner,
-          }).should.be.fulfilled
+          const { logs: logs1 } = await feeManager.setFee(homeToForeignFee, token.address, ANY_ADDRESS, TEN_PERCENT_FEE)
+          const { logs: logs2 } = await feeManager.setFee(
+            foreignToHomeFee,
+            token.address,
+            ANY_ADDRESS,
+            TWENTY_PERCENT_FEE
+          )
 
           expectEventInLogs(logs1, 'FeeUpdated')
           expectEventInLogs(logs2, 'FeeUpdated')
-          expect(await feeManager.getFee(homeToForeignFee, token.address)).to.be.bignumber.equal(ether('0.1'))
-          expect(await feeManager.getFee(foreignToHomeFee, token.address)).to.be.bignumber.equal(ether('0.2'))
+          expect(toFee(await feeManager.getFee(homeToForeignFee, token.address, user))).to.be.eql(TEN_PERCENT_FEE)
+          expect(toFee(await feeManager.getFee(foreignToHomeFee, token.address, user))).to.be.eql(TWENTY_PERCENT_FEE)
         })
 
         it('should update fee value for bridged token', async () => {
@@ -1793,23 +1829,24 @@ function runTests(accounts, isHome) {
           expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
           const bridgedToken = await contract.bridgedTokenAddress(otherSideToken1)
 
-          await feeManager.setFee(homeToForeignFee, bridgedToken, ether('0.1'), { from: user }).should.be.rejected
-          await feeManager.setFee(homeToForeignFee, bridgedToken, ether('1.1'), { from: owner }).should.be.rejected
-          const { logs: logs1 } = await feeManager.setFee(homeToForeignFee, bridgedToken, ether('0.1'), { from: owner })
-            .should.be.fulfilled
-          const { logs: logs2 } = await feeManager.setFee(foreignToHomeFee, bridgedToken, ether('0.2'), { from: owner })
-            .should.be.fulfilled
+          const { logs: logs1 } = await feeManager.setFee(homeToForeignFee, bridgedToken, ANY_ADDRESS, TEN_PERCENT_FEE)
+          const { logs: logs2 } = await feeManager.setFee(
+            foreignToHomeFee,
+            bridgedToken,
+            ANY_ADDRESS,
+            TWENTY_PERCENT_FEE
+          )
 
           expectEventInLogs(logs1, 'FeeUpdated')
           expectEventInLogs(logs2, 'FeeUpdated')
-          expect(await feeManager.getFee(homeToForeignFee, bridgedToken)).to.be.bignumber.equal(ether('0.1'))
-          expect(await feeManager.getFee(foreignToHomeFee, bridgedToken)).to.be.bignumber.equal(ether('0.2'))
+          expect(toFee(await feeManager.getFee(homeToForeignFee, bridgedToken, user))).to.be.eql(TEN_PERCENT_FEE)
+          expect(toFee(await feeManager.getFee(foreignToHomeFee, bridgedToken, user))).to.be.eql(TWENTY_PERCENT_FEE)
         })
       })
 
       function testHomeToForeignFee(isNative) {
         it('should collect and distribute 0% fee', async () => {
-          await feeManager.setFee(homeToForeignFee, isNative ? ZERO_ADDRESS : token.address, ZERO).should.be.fulfilled
+          await feeManager.setFee(homeToForeignFee, isNative ? ANY_ADDRESS : token.address, ANY_ADDRESS, ZERO_FEE)
           expect(await contract.totalSpentPerDay(token.address, currentDay)).to.be.bignumber.equal(ZERO)
           await token.transferAndCall(contract.address, value, '0x', { from: user })
           expect(await contract.totalSpentPerDay(token.address, currentDay)).to.be.bignumber.equal(value)
@@ -1895,14 +1932,14 @@ function runTests(accounts, isHome) {
 
         describe('distribute fee for foreign => home direction', async () => {
           beforeEach(async () => {
-            await feeManager.setFee(homeToForeignFee, ZERO_ADDRESS, ZERO).should.be.fulfilled
+            await feeManager.setFee(homeToForeignFee, ANY_ADDRESS, ANY_ADDRESS, ZERO_FEE).should.be.fulfilled
             await token.mint(user, ether('10'), { from: owner }).should.be.fulfilled
             await token.transferAndCall(contract.address, value, '0x', { from: user }).should.be.fulfilled
             await token.transferAndCall(contract.address, value, '0x', { from: user }).should.be.fulfilled
           })
 
           it('should collect and distribute 0% fee', async () => {
-            await feeManager.setFee(foreignToHomeFee, token.address, ZERO).should.be.fulfilled
+            await feeManager.setFee(foreignToHomeFee, token.address, ANY_ADDRESS, ZERO_FEE).should.be.fulfilled
             const data = contract.contract.methods.handleNativeTokens(token.address, user, value).encodeABI()
 
             expect(await executeMessageCall(exampleMessageId, data)).to.be.equal(true)
@@ -2014,7 +2051,7 @@ function runTests(accounts, isHome) {
       describe('distribute fee for bridged tokens', () => {
         describe('distribute fee for foreign => home direction', async () => {
           it('should collect and distribute 0% fee', async () => {
-            await feeManager.setFee(foreignToHomeFee, ZERO_ADDRESS, ZERO).should.be.fulfilled
+            await feeManager.setFee(foreignToHomeFee, ANY_ADDRESS, ANY_ADDRESS, ZERO_FEE).should.be.fulfilled
             const args = [otherSideToken1, 'Test', 'TST', 18, user, value]
             const deployData = contract.contract.methods.deployAndHandleBridgedTokens(...args).encodeABI()
 
@@ -2144,7 +2181,7 @@ function runTests(accounts, isHome) {
 
         describe('distribute fee for home => foreign direction', async () => {
           beforeEach(async () => {
-            await feeManager.setFee(foreignToHomeFee, ZERO_ADDRESS, ZERO).should.be.fulfilled
+            await feeManager.setFee(foreignToHomeFee, ANY_ADDRESS, ANY_ADDRESS, ZERO_FEE).should.be.fulfilled
             const args = [otherSideToken1, 'Test', 'TST', 18, user, value]
             const deployData = contract.contract.methods.deployAndHandleBridgedTokens(...args).encodeABI()
 
